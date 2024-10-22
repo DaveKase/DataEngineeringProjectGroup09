@@ -1,0 +1,20 @@
+services:
+  airflow:
+    image: apache/airflow:2.5.1
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////usr/local/airflow/airflow.db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW_UID=${AIRFLOW_UID}
+    volumes:
+      - ${PWD}/dags:/usr/local/airflow/dags
+      - ${PWD}/logs:/usr/local/airflow/logs
+      - ${PWD}/plugins:/usr/local/airflow/plugins
+      - ${PWD}/data:/usr/local/airflow/data
+    ports:
+      - "8080:8080"
+    command: webserver
+  duckdb:
+    image: duckdb/duckdb
+    volumes:
+      - ${PWD}/data:/data
