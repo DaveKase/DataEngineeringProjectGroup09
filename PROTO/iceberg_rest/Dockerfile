@@ -1,0 +1,16 @@
+# Use the base image
+FROM tabulario/iceberg-rest:1.6.0
+
+# Switch to root to set up directories and permissions
+USER root
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Set up necessary directories and permissions
+RUN mkdir -p /iceberg/warehouse/weather && chmod -R 777 /iceberg/warehouse
+
+# Switch back to the default iceberg user
+USER iceberg
+
+# Set entrypoint to start the Iceberg REST service
+ENTRYPOINT ["java", "-jar", "iceberg-rest-image-all.jar"]
