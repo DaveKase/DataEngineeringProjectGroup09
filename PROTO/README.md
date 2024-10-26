@@ -1,0 +1,1 @@
+Before you run this, make sure you have created a folder mnt and inside this a folder named tmp. In the the tmp folder create folders .dbt, dbt_project, csv_data, duckdb_data and warehouse. Hopefully it works then :)
