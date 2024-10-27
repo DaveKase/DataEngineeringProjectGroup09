@@ -11,8 +11,8 @@ from pyiceberg.catalog import load_catalog
 from pyiceberg.schema import Schema, NestedField
 from pyiceberg.types import StringType, LongType, FloatType, TimestampType, DoubleType
 
-# Set your VisualCrossing API key
-API_KEY = 'ME99LN6RNMBG6PXA66TN4JZ8G'
+# Load the weather API key from the environment variables
+API_KEY = os.getenv('_WEATHER_API_KEY')
 
 # Define Estonia's coordinates
 estonia_coordinates = '59.35,24.80'

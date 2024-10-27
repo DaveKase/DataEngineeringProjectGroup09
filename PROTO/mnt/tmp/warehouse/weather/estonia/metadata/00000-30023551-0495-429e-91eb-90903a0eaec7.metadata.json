@@ -1,0 +1,130 @@
+{
+  "format-version" : 2,
+  "table-uuid" : "99fce24e-0341-4a42-bcb4-d9a672fee0f0",
+  "location" : "/iceberg/warehouse/weather/estonia",
+  "last-sequence-number" : 0,
+  "last-updated-ms" : 1730044144133,
+  "last-column-id" : 19,
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "Address",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 2,
+      "name" : "Date time",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 3,
+      "name" : "Minimum Temperature",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 4,
+      "name" : "Maximum Temperature",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 5,
+      "name" : "Temperature",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "Dew Point",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 7,
+      "name" : "Relative Humidity",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 8,
+      "name" : "Wind Speed",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 9,
+      "name" : "Wind Direction",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 10,
+      "name" : "Precipitation",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 11,
+      "name" : "Visibility",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 12,
+      "name" : "Cloud Cover",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 13,
+      "name" : "Sea Level Pressure",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 14,
+      "name" : "Contributing Stations",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 15,
+      "name" : "Latitude",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 16,
+      "name" : "Longitude",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 17,
+      "name" : "Name",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 18,
+      "name" : "Conditions",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 19,
+      "name" : "Country",
+      "required" : false,
+      "type" : "string"
+    } ]
+  } ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "write.parquet.compression-codec" : "zstd"
+  },
+  "current-snapshot-id" : -1,
+  "refs" : { },
+  "snapshots" : [ ],
+  "statistics" : [ ],
+  "partition-statistics" : [ ],
+  "snapshot-log" : [ ],
+  "metadata-log" : [ ]
+}

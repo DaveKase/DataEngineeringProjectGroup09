@@ -1,0 +1,37 @@
+# Name your project
+name: 'data_engineering_project'
+version: '1.0.0'
+
+profile: 'data_engineering_project'
+
+# Specify the paths for different types of files
+model-paths: ["models"]          # Path for your models
+analysis-paths: ["analyses"]    # Path for your analyses
+test-paths: ["tests"]            # Path for your tests
+seed-paths: ["seeds"]            # Path for your seed files
+macro-paths: ["macros"]          # Path for your macros
+snapshot-paths: ["snapshots"]    # Path for your snapshots
+
+# Clean targets to be removed by `dbt clean`
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Configuring models for each target
+models:
+  data_engineering_project:
+    # Models related to weather
+    cleaned_weather:
+      +materialized: table  # You can set it to 'view' or 'table' as per your requirement
+
+    # Models related to price
+    #price:
+    #  +materialized: view
+
+    # Models related to production
+    #production:
+    #  +materialized: view
+
+    # Models related to consumption
+    #consumption:
+    #  +materialized: view

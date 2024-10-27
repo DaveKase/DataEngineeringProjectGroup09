@@ -19,6 +19,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
     _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+    _WEATHER_API_KEY: ${_WEATHER_API_KEY}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -27,6 +28,7 @@ x-airflow-common: &airflow-common
     - ./mnt/tmp/duckdb_data:/mnt/tmp/duckdb_data
     - ./mnt/tmp/warehouse:/iceberg/warehouse  # Access to Iceberg warehouse
     - ./mnt/tmp/warehouse:/mnt/tmp/warehouse # DuckDB access
+    - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket for Airflow services
   user: "${AIRFLOW_UID:-50000}:0"
   networks:
     - airflow_network
@@ -69,6 +71,8 @@ services:
   airflow-webserver:
     <<: *airflow-common
     command: webserver
+    # volumes:
+    #   - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8080:8080"
     healthcheck:
@@ -82,6 +86,8 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
+    # volumes:
+    #   - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8793/health"]
       interval: 30s
@@ -93,6 +99,8 @@ services:
   airflow-worker:
     <<: *airflow-common
     command: celery worker
+    # volumes:
+    #   - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD-SHELL", 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"']
       interval: 30s
@@ -118,8 +126,6 @@ services:
     command:
       - -c
       - |
-        mkdir -p /iceberg && chmod -R 777 /iceberg
-        mkdir -p /iceberg/warehouse && chmod -R 777 /iceberg/warehouse
         airflow db init
         airflow users create \
           --username "${_AIRFLOW_WWW_USER_USERNAME}" \
@@ -168,8 +174,10 @@ services:
       context: ./dbt
     container_name: dbt
     tty: true
+    command: ["tail", "-f", "/dev/null"]
     volumes:
-      - ./mnt/tmp/dbt_project:/usr/app
+      - ./mnt/tmp/duckdb_data:/usr/app/mnt/tmp/duckdb_data
+      - ./mnt/tmp/dbt_project:/usr/app/
       - ./mnt/tmp/.dbt:/root/.dbt
     ports:
       - "18080:8080"

@@ -7,6 +7,7 @@ USER root
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Set up necessary directories and permissions
+RUN mkdir -p /app/mnt/tmp/warehouse && chmod -R 777 /app/mnt/tmp/warehouse
 RUN mkdir -p /iceberg/warehouse/weather && chmod -R 777 /iceberg/warehouse
 
 # Switch back to the default iceberg user
