@@ -1,0 +1,45 @@
+{
+  "format-version" : 2,
+  "table-uuid" : "26e7cb29-c753-4232-8966-6d2a965ddcb7",
+  "location" : "/iceberg/warehouse/weather/estonia",
+  "last-sequence-number" : 0,
+  "last-updated-ms" : 1732524834609,
+  "last-column-id" : 2,
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "remainingCost",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 2,
+      "name" : "queryCost",
+      "required" : false,
+      "type" : "long"
+    } ]
+  } ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "write.parquet.compression-codec" : "zstd"
+  },
+  "current-snapshot-id" : -1,
+  "refs" : { },
+  "snapshots" : [ ],
+  "statistics" : [ ],
+  "partition-statistics" : [ ],
+  "snapshot-log" : [ ],
+  "metadata-log" : [ ]
+}

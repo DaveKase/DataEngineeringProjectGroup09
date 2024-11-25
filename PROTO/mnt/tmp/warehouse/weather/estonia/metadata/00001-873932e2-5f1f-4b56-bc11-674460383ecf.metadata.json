@@ -1,0 +1,159 @@
+{
+  "format-version" : 2,
+  "table-uuid" : "982babe0-91b6-4f64-817e-5221cb6a914f",
+  "location" : "/iceberg/warehouse/weather/estonia",
+  "last-sequence-number" : 1,
+  "last-updated-ms" : 1732526593336,
+  "last-column-id" : 19,
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "wdir",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 2,
+      "name" : "datetimeStr",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 3,
+      "name" : "mint",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 4,
+      "name" : "datetime",
+      "required" : false,
+      "type" : "timestamp"
+    }, {
+      "id" : 5,
+      "name" : "precip",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "solarradiation",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 7,
+      "name" : "dew",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 8,
+      "name" : "humidity",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 9,
+      "name" : "temp",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 10,
+      "name" : "maxt",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 11,
+      "name" : "visibility",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 12,
+      "name" : "wspd",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 13,
+      "name" : "solarenergy",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 14,
+      "name" : "stationinfo",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 15,
+      "name" : "weathertype",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 16,
+      "name" : "sealevelpressure",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 17,
+      "name" : "conditions",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 18,
+      "name" : "windchill",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 19,
+      "name" : "stationContributions",
+      "required" : false,
+      "type" : "string"
+    } ]
+  } ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "write.parquet.compression-codec" : "zstd"
+  },
+  "current-snapshot-id" : 3507016871183570574,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 3507016871183570574,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "sequence-number" : 1,
+    "snapshot-id" : 3507016871183570574,
+    "timestamp-ms" : 1732526593336,
+    "summary" : {
+      "operation" : "append",
+      "added-files-size" : "13779",
+      "added-data-files" : "1",
+      "added-records" : "24",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-records" : "24",
+      "total-files-size" : "13779",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/iceberg/warehouse/weather/estonia/metadata/snap-3507016871183570574-0-453e93f9-7bb3-4443-a4eb-09b3b09c0f75.avro",
+    "schema-id" : 0
+  } ],
+  "statistics" : [ ],
+  "partition-statistics" : [ ],
+  "snapshot-log" : [ {
+    "timestamp-ms" : 1732526593336,
+    "snapshot-id" : 3507016871183570574
+  } ],
+  "metadata-log" : [ {
+    "timestamp-ms" : 1732526593161,
+    "metadata-file" : "/iceberg/warehouse/weather/estonia/metadata/00000-2836a429-ed62-480d-98b8-f451bf6f59c3.metadata.json"
+  } ]
+}
