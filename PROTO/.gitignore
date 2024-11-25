@@ -1,0 +1,11 @@
+# Ignore .env file
+PROTO/.env
+.env
+
+# Ignore contents of duckdb_data folder but keep the folder itself
+PROTO/mnt/tmp/duckdb_data/*
+!PROTO/mnt/tmp/duckdb_data/.gitkeep
+
+# Ignore contents of warehouse folder but keep the folder itself
+PROTO/mnt/tmp/warehouse/*
+!PROTO/mnt/tmp/warehouse/.gitkeep
