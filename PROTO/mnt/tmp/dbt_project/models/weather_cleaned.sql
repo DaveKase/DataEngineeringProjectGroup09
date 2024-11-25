@@ -1,29 +1,54 @@
 with raw_data as (
+    -- Combine weather tables from multiple countries
     select
-        Address as address,
-        Date_x20time as date_time,
-        Minimum_x20Temperature as minimum_temperature,
-        Maximum_x20Temperature as maximum_temperature,
-        Temperature as temperature,
-        Dew_x20Point as dew_point,
-        Relative_x20Humidity as relative_humidity,
-        Wind_x20Speed as wind_speed,
-        Wind_x20Direction as wind_direction,
-        Precipitation as precipitation,
-        Visibility as visibility,
-        Cloud_x20Cover as cloud_cover,
-        Sea_x20Level_x20Pressure as sea_level_pressure,
-        Contributing_x20Stations as contributing_stations,
-        Latitude as latitude,
-        Longitude as longitude,
-        Conditions as conditions,
-        Country as country
-    from "weather_estonia"  -- Directly reference the table in the DuckDB database
+        'Estonia' as country, -- Add a country identifier
+        datetimeStr as datetime_str,
+        datetime as date_time,
+        mint as minimum_temperature,
+        maxt as maximum_temperature,
+        temp as temperature,
+        dew as dew_point,
+        humidity as relative_humidity,
+        wspd as wind_speed,
+        wdir as wind_direction,
+        precip as precipitation,
+        visibility as visibility,
+        solarenergy as solar_energy,
+        solarradiation as solar_radiation,
+        sealevelpressure as sea_level_pressure,
+        stationinfo as station_info,
+        conditions,
+        stationContributions as contributing_stations
+    from weather_estonia
+
+    union all
+
+    select
+        'Latvia' as country, -- Add a country identifier
+        datetimeStr as datetime_str,
+        datetime as date_time,
+        mint as minimum_temperature,
+        maxt as maximum_temperature,
+        temp as temperature,
+        dew as dew_point,
+        humidity as relative_humidity,
+        wdir as wind_direction,
+        wspd as wind_speed,
+        precip as precipitation,
+        visibility as visibility,
+        solarenergy as solar_energy,
+        solarradiation as solar_radiation,
+        sealevelpressure as sea_level_pressure,
+        stationinfo as station_info,
+        conditions,
+        stationContributions as contributing_stations
+    from weather_latvia
 ),
 
--- Cleaned data: removing the name column and renaming
+-- Cleaned data: Select and rename columns
 cleaned_data as (
     select
+        country,
         date_time,
         minimum_temperature,
         maximum_temperature,
@@ -34,16 +59,14 @@ cleaned_data as (
         wind_direction,
         precipitation,
         visibility,
-        cloud_cover,
+        solar_energy,
+        solar_radiation,
         sea_level_pressure,
         contributing_stations,
-        latitude,
-        longitude,
-        conditions,
-        country
+        conditions
     from raw_data
 )
 
--- Create a view that includes all cleaned data
+-- Final output: Select all cleaned data
 select *
 from cleaned_data
