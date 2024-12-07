@@ -128,7 +128,7 @@ def process_and_save_to_iceberg(**context):
         df = pd.DataFrame(values)
         df["Country"] = country
         df["EIC"] = row["EIC"]
-        df["BZN"] = row["Bidding Zone Aggregation (BZN)"]
+        df["BZN"] = row["BZN"]
 
         # Include the station contributions as a single JSON-like string
         station_contributions_str = json.dumps(station_contributions)
