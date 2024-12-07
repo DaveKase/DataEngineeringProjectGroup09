@@ -26,6 +26,7 @@ x-airflow-common: &airflow-common
     - ./plugins:/opt/airflow/plugins
     - ./mnt/tmp/csv_data:/mnt/tmp/csv_data
     - ./mnt/tmp/duckdb_data:/mnt/tmp/duckdb_data
+   # - ./config_files:/config_files
     - ./mnt/tmp/warehouse:/iceberg/warehouse  # Access to Iceberg warehouse
     - ./mnt/tmp/warehouse:/mnt/tmp/warehouse # DuckDB access
     - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket for Airflow services
