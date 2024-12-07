@@ -4,9 +4,8 @@ from datetime import datetime, timedelta
 import requests
 import os
 import json
-import pyarrow as pa
-import pyarrow.json as pj
 import pandas as pd
+import pyarrow as pa
 from pyiceberg.catalog import load_catalog
 from pyiceberg.schema import Schema, NestedField
 from pyiceberg.types import StringType, LongType, FloatType, TimestampType, DoubleType
@@ -14,25 +13,47 @@ from pyiceberg.types import StringType, LongType, FloatType, TimestampType, Doub
 # Load the weather API key from the environment variables
 API_KEY = os.getenv('_WEATHER_API_KEY')
 
-# Define country coordinates
-COUNTRY_COORDINATES = {
-    "Estonia": "59.35,24.80",
-    "Latvia": "56.95,24.11"
-}
-
 # Base URL for the API
 BASE_URL = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata/history'
+
+# Load config dates
+CONFIG_FILE = '/opt/airflow/config_files/config_dates.json'
+with open(CONFIG_FILE, 'r') as f:
+    config_dates = json.load(f)
+
+config_start_date = datetime.strptime(config_dates["start_date"], '%Y-%m-%d')
+config_end_date = datetime.strptime(config_dates["end_date"], '%Y-%m-%d')
+
+# Adjust the date range to be a maximum of 48 hours
+if (config_end_date - config_start_date).total_seconds() > 48 * 3600:
+    print("Weather data of max 48 hours can be queried. Adjusting start date accordingly.")
+    config_start_date = config_end_date - timedelta(hours=48)
+
+# Load country codes and coordinates from CSV
+COUNTRY_CODES_FILE = '/opt/airflow/config_files/country_code_mapper.csv'
+country_df = pd.read_csv(COUNTRY_CODES_FILE)
+
+#test_countries = ["Estonia", "Latvia", "Lithuania"]
+#filtered_country_df = country_df[country_df['Country'].isin(test_countries)]
+
+COUNTRY_COORDINATES = {
+    row['BZN']: f"{row['Latitude']},{row['Longitude']}" for _, row in country_df.iterrows()
+}
 
 # Function to fetch weather data and save as JSON
 def fetch_weather_data(**context):
     """
-    Fetch weather data for the past day and save as JSON for each country.
+    Fetch weather data for the configured date range and save as JSON for all countries.
     """
-    end_date = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
+    start_date = config_start_date.strftime('%Y-%m-%d')
+    end_date = config_end_date.strftime('%Y-%m-%d')
 
-    for country, coordinates in COUNTRY_COORDINATES.items():
-        output_dir = f'/mnt/tmp/warehouse/weather/{country.lower()}/data'
-        os.makedirs(output_dir, exist_ok=True)
+    output_dir = '/mnt/tmp/warehouse/weather'
+    os.makedirs(output_dir, exist_ok=True)
+
+    for _, row in country_df.iterrows():
+        country = row['BZN']
+        coordinates = COUNTRY_COORDINATES[country]
 
         params = {
             'unitGroup': 'metric',
@@ -40,7 +61,7 @@ def fetch_weather_data(**context):
             'aggregateHours': 1,
             'dayStartTime': '0:00:00',
             'dayEndTime': '23:59:59',
-            'startDateTime': f'{end_date}T00:00:00',
+            'startDateTime': f'{start_date}T00:00:00',
             'endDateTime': f'{end_date}T23:59:59',
             'locations': coordinates,
             'collectStationContribution': 'true',
@@ -50,7 +71,7 @@ def fetch_weather_data(**context):
         response = requests.get(BASE_URL, params=params)
 
         if response.status_code == 200:
-            output_file = os.path.join(output_dir, f'weather_{end_date}.json')
+            output_file = os.path.join(output_dir, f'weather_{country.lower()}_{start_date}_to_{end_date}.json')
             with open(output_file, 'w') as f:
                 json.dump(response.json(), f)
             print(f"Weather data saved for {country}: {output_file}")
@@ -77,14 +98,17 @@ def arrow_to_iceberg_schema(pa_schema):
 # Function to process JSON files and save data to Iceberg
 def process_and_save_to_iceberg(**context):
     """
-    Process JSON files and save data to Iceberg.
+    Process JSON files and save data to Iceberg as a single table.
     """
-    end_date = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
-
     catalog = load_catalog("rest", uri="http://iceberg_rest:8181")
+    table_name = "weather.data"
+    iceberg_directory = "/iceberg/warehouse/weather"
 
-    for country in COUNTRY_COORDINATES.keys():
-        json_file_path = f"/mnt/tmp/warehouse/weather/{country.lower()}/data/weather_{end_date}.json"
+    all_data = []
+
+    for _, row in country_df.iterrows():
+        country = row['Country']
+        json_file_path = f"/mnt/tmp/warehouse/weather/weather_{country.lower()}_{config_start_date.strftime('%Y-%m-%d')}_to_{config_end_date.strftime('%Y-%m-%d')}.json"
 
         if not os.path.exists(json_file_path):
             print(f"JSON file for {country} not found: {json_file_path}")
@@ -102,6 +126,9 @@ def process_and_save_to_iceberg(**context):
 
         # Convert to a Pandas DataFrame
         df = pd.DataFrame(values)
+        df["Country"] = country
+        df["EIC"] = row["EIC"]
+        df["BZN"] = row["Bidding Zone Aggregation (BZN)"]
 
         # Include the station contributions as a single JSON-like string
         station_contributions_str = json.dumps(station_contributions)
@@ -116,38 +143,30 @@ def process_and_save_to_iceberg(**context):
         non_null_columns = [col for col in df.columns if df[col].notnull().all()]
         df = df[non_null_columns]
 
-        # Save to Iceberg
-        iceberg_directory = f"/iceberg/warehouse/weather/{country.lower()}"
-        table_name = f"weather.{country.lower()}"
+        all_data.append(df)
 
-        os.makedirs(iceberg_directory, exist_ok=True)
+    # Combine all data
+    combined_df = pd.concat(all_data, ignore_index=True)
 
-        # Convert to PyArrow table
-        table = pa.Table.from_pandas(df)
+    # Save to Iceberg
+    table = pa.Table.from_pandas(combined_df)
 
-        # Ensure datetime is in microseconds in PyArrow schema
-        table = table.set_column(
-            table.schema.get_field_index("datetime"),
-            "datetime",
-            pa.array(table.column("datetime").to_pylist(), pa.timestamp("us"))
+    try:
+        iceberg_table = catalog.load_table(table_name)
+        print(f"Iceberg table {table_name} exists. Appending new data.")
+    except Exception as e:
+        print(f"Iceberg table {table_name} does not exist. Creating table: {e}")
+        iceberg_schema = arrow_to_iceberg_schema(table.schema)
+        catalog.create_table(
+            identifier=table_name,
+            schema=iceberg_schema,
+            location=iceberg_directory
         )
+        iceberg_table = catalog.load_table(table_name)
 
-        try:
-            iceberg_table = catalog.load_table(table_name)
-            print(f"Iceberg table {table_name} exists. Appending new data.")
-        except Exception as e:
-            print(f"Iceberg table {table_name} does not exist. Creating table: {e}")
-            iceberg_schema = arrow_to_iceberg_schema(table.schema)
-            catalog.create_table(
-                identifier=table_name,
-                schema=iceberg_schema,
-                location=iceberg_directory
-            )
-            iceberg_table = catalog.load_table(table_name)
-
-        # Append data to the Iceberg table
-        iceberg_table.append(table)
-        print(f"Appended data to Iceberg table: {table_name}")
+    # Append data to the Iceberg table
+    iceberg_table.append(table)
+    print(f"Appended data to Iceberg table: {table_name}")
 
 
 # Define the DAG
