@@ -184,5 +184,17 @@ services:
     networks:
       - airflow_network
 
+  sl:
+    container_name: sl
+    build:
+      context: ./streamlit
+    volumes:
+      - ./streamlit:/usr/app  
+      - ./mnt/tmp/duckdb_data:/usr/app/data 
+    ports:
+      - "8501:8501" 
+    networks:
+      - airflow_network 
+
 volumes:
   postgres-db-volume:
