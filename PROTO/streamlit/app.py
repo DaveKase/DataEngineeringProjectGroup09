@@ -37,7 +37,7 @@ try:
     min_date, max_date = min_date.to_pydatetime(), max_date.to_pydatetime()
 
     distinct_countries_query = """
-        SELECT DISTINCT country 
+        SELECT DISTINCT bzn 
         FROM weather_cleaned
     """
     countries = sorted([row[0] for row in weather.execute(distinct_countries_query).fetchall()])  # Sort alphabetically
@@ -47,7 +47,7 @@ except Exception as e:
 
 # ---- Sidebar Filters ----
 st.sidebar.header("Filters")
-selected_country = st.sidebar.selectbox("Select a Country", countries)
+selected_country = st.sidebar.selectbox("Select a Country/Region", countries)
 date_range = st.sidebar.slider(
     "Select Date Range",
     min_value=min_date,
@@ -60,7 +60,7 @@ date_range = st.sidebar.slider(
 filtered_query = f"""
     SELECT date_time, temperature, solar_radiation
     FROM weather_cleaned
-    WHERE country = '{selected_country}'
+    WHERE bzn = '{selected_country}'
       AND date_time BETWEEN '{date_range[0].strftime("%Y-%m-%d %H:%M:%S")}' AND '{date_range[1].strftime("%Y-%m-%d %H:%M:%S")}'
     ORDER BY date_time
 """
