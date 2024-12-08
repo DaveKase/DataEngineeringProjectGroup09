@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Set our ENTSO-E API token here
-api_token = os.getenv('_PRICE_API_KEY')
+api_token = os.getenv('_ENTSOE_SECURITY_TOKEN')
 
 # Define the endpoint and headers
 endpoint = "https://web-api.tp.entsoe.eu/api"

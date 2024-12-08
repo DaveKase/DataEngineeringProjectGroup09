@@ -107,7 +107,7 @@ def process_and_save_to_iceberg(**context):
     all_data = []
 
     for _, row in country_df.iterrows():
-        country = row['Country']
+        country = row['BZN']
         json_file_path = f"/mnt/tmp/warehouse/weather/weather_{country.lower()}_{config_start_date.strftime('%Y-%m-%d')}_to_{config_end_date.strftime('%Y-%m-%d')}.json"
 
         if not os.path.exists(json_file_path):
@@ -133,9 +133,11 @@ def process_and_save_to_iceberg(**context):
         # Include the station contributions as a single JSON-like string
         station_contributions_str = json.dumps(station_contributions)
         df["stationContributions"] = station_contributions_str
+        
+        #print(df.columns)
 
         # Use 'datetimeStr' directly for date-time field
-        df["datetime"] = pd.to_datetime(df["datetimeStr"])  # ISO 8601 format
+        df["datetime"] = pd.to_datetime(df["datetime"])  # ISO 8601 format
         df["datetime"] = df["datetime"].dt.tz_localize(None)  # Remove timezone
         df["datetime"] = df["datetime"].astype("datetime64[us]")  # Downcast to microsecond precision
 
