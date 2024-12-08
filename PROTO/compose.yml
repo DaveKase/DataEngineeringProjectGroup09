@@ -20,6 +20,7 @@ x-airflow-common: &airflow-common
     _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
     _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
     _WEATHER_API_KEY: ${_WEATHER_API_KEY}
+    _ENTSOE_SECURITY_TOKEN: ${_ENTSOE_SECURITY_TOKEN}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs

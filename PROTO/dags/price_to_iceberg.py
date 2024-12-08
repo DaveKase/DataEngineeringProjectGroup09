@@ -15,11 +15,11 @@ from pyiceberg.types import StringType, LongType, FloatType, TimestampType, Doub
 
 df = pd.DataFrame()
 
-def fetch_and_process():
+API_KEY = os.getenv('_ENTSOE_SECURITY_TOKEN')
+print(API_KEY)
+
+def fetch_and_process(**context):
     # Load environment variables from .env file
-    load_dotenv()
-    security_token = os.getenv('_ENTSOE_SECURITY_TOKEN')
-    print(security_token)
     url = "https://web-api.tp.entsoe.eu/api"
 
     # Get bidding zones EIC code from file
@@ -33,6 +33,8 @@ def fetch_and_process():
     start_date = datetime.strptime(config["start_date"], "%Y-%m-%d")
     end_date = datetime.strptime(config["end_date"], "%Y-%m-%d")
     period_duration = timedelta(days=31)  # Example: one-month intervals
+    
+    print(start_date, end_date)
 
     time_periods = []
     current_start = start_date
@@ -59,7 +61,7 @@ def fetch_and_process():
                 "periodStart": period_start,
                 "periodEnd": period_end,
                 "contract_MarketAgreement.type": 'A01',
-                "securityToken": security_token,
+                "securityToken": API_KEY,
             }
 
             # Send API request
@@ -123,7 +125,7 @@ def fetch_and_process():
     return df
 
 
-def save_to_iceberg():
+def save_to_iceberg(**context):
     # Load the Iceberg REST catalog
     catalog = load_catalog("rest", uri="http://iceberg_rest:8181")
     table_name = "price.data"
