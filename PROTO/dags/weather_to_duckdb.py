@@ -56,7 +56,7 @@ def load_latest_parquet_to_duckdb(**kwargs):
 
 # Airflow DAG definition
 with DAG(
-    dag_id="iceberg_to_duckdb",
+    dag_id="iceberg_weather_to_duckdb",
     default_args={
         "owner": "airflow",
         "retries": 1,
@@ -68,6 +68,6 @@ with DAG(
 ) as dag:
     
     load_data_task = PythonOperator(
-        task_id="iceberg_to_duckdb",
+        task_id="iceberg_weather_to_duckdb",
         python_callable=load_latest_parquet_to_duckdb,
     )

@@ -52,8 +52,8 @@ def fetch_weather_data(**context):
     os.makedirs(output_dir, exist_ok=True)
 
     for _, row in country_df.iterrows():
-        country = row['BZN']
-        coordinates = COUNTRY_COORDINATES[country]
+        country_bzn = row['BZN']
+        coordinates = COUNTRY_COORDINATES[country_bzn]
 
         params = {
             'unitGroup': 'metric',
@@ -71,12 +71,12 @@ def fetch_weather_data(**context):
         response = requests.get(BASE_URL, params=params)
 
         if response.status_code == 200:
-            output_file = os.path.join(output_dir, f'weather_{country.lower()}_{start_date}_to_{end_date}.json')
+            output_file = os.path.join(output_dir, f'weather_{country_bzn.lower()}_{start_date}_to_{end_date}.json')
             with open(output_file, 'w') as f:
                 json.dump(response.json(), f)
-            print(f"Weather data saved for {country}: {output_file}")
+            print(f"Weather data saved for {country_bzn}: {output_file}")
         else:
-            raise Exception(f"Failed to fetch weather data for {country}. Status code: {response.status_code}")
+            raise Exception(f"Failed to fetch weather data for {country_bzn}. Status code: {response.status_code}")
 
 # Function to map PyArrow schema to Iceberg schema
 def arrow_to_iceberg_schema(pa_schema):
@@ -107,11 +107,13 @@ def process_and_save_to_iceberg(**context):
     all_data = []
 
     for _, row in country_df.iterrows():
-        country = row['BZN']
-        json_file_path = f"/mnt/tmp/warehouse/weather/weather_{country.lower()}_{config_start_date.strftime('%Y-%m-%d')}_to_{config_end_date.strftime('%Y-%m-%d')}.json"
+        country_bzn = row['BZN']
+        country_name = row['Country']
+        
+        json_file_path = f"/mnt/tmp/warehouse/weather/weather_{country_bzn.lower()}_{config_start_date.strftime('%Y-%m-%d')}_to_{config_end_date.strftime('%Y-%m-%d')}.json"
 
         if not os.path.exists(json_file_path):
-            print(f"JSON file for {country} not found: {json_file_path}")
+            print(f"JSON file for {country_bzn} not found: {json_file_path}")
             continue
 
         # Load and parse JSON file
@@ -126,7 +128,7 @@ def process_and_save_to_iceberg(**context):
 
         # Convert to a Pandas DataFrame
         df = pd.DataFrame(values)
-        df["Country"] = country
+        df["Country"] = country_name
         df["EIC"] = row["EIC"]
         df["BZN"] = row["BZN"]
 
@@ -137,7 +139,7 @@ def process_and_save_to_iceberg(**context):
         #print(df.columns)
 
         # Use 'datetimeStr' directly for date-time field
-        df["datetime"] = pd.to_datetime(df["datetime"])  # ISO 8601 format
+        df["datetime"] = pd.to_datetime(df["datetime"], unit='ms')  # ISO 8601 format
         df["datetime"] = df["datetime"].dt.tz_localize(None)  # Remove timezone
         df["datetime"] = df["datetime"].astype("datetime64[us]")  # Downcast to microsecond precision
 
