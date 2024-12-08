@@ -183,7 +183,7 @@ with DAG(
 
     # Task 1: Fetch weather data
     fetch_data = PythonOperator(
-        task_id='fetch_weather_data',
+        task_id='fetch_price_data',
         python_callable=fetch_and_process
     )
 
