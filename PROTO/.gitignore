@@ -8,4 +8,5 @@ PROTO/mnt/tmp/duckdb_data/*
 
 # Ignore contents of warehouse folder but keep the folder itself
 PROTO/mnt/tmp/warehouse/weather/*
+PROTO/mnt/tmp/warehouse/weather/*.json
 !PROTO/mnt/tmp/warehouse/weather/.gitkeep
