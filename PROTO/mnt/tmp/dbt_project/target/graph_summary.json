@@ -1,1 +1,1 @@
-{"_invocation_id": "9b2e3692-f977-4bf6-88f7-a5f76ac01955", "linked": {"0": {"name": "model.data_engineering_project.weather_cleaned", "type": "model"}}}
+{"_invocation_id": "19f8e2cd-1e34-4174-a21c-4cc9e88e4de9", "linked": {"0": {"name": "model.data_engineering_project.weather_cleaned", "type": "model"}, "1": {"name": "model.data_engineering_project.production_cleaned", "type": "model"}, "2": {"name": "model.data_engineering_project.consumption_cleaned", "type": "model"}, "3": {"name": "model.data_engineering_project.price_cleaned", "type": "model"}}}

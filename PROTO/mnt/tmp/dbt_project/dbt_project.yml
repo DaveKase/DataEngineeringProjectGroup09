@@ -20,18 +20,15 @@ clean-targets:
 # Configuring models for each target
 models:
   data_engineering_project:
-    # Models related to weather
-    cleaned_weather:
-      +materialized: table  # You can set it to 'view' or 'table' as per your requirement
+    weather:
+      weather_cleaned:
+        +materialized: table  # Materialized as a table in the combined DuckDB database
 
-    # Models related to price
-    #price:
-    #  +materialized: view
+    consumption_cleaned:
+      +materialized: table  # Materialized as a table in the combined DuckDB database
 
-    # Models related to production
-    #production:
-    #  +materialized: view
+    price_cleaned:
+      +materialized: table  # Materialized as a table in the combined DuckDB database
 
-    # Models related to consumption
-    #consumption:
-    #  +materialized: view
+    production_cleaned:
+      +materialized: table  # Materialized as a table in the combined DuckDB database

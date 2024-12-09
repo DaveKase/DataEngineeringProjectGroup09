@@ -1,0 +1,89 @@
+{
+  "format-version" : 2,
+  "table-uuid" : "bb98a32a-068e-42d4-8635-d794228e2e77",
+  "location" : "/iceberg/warehouse/price",
+  "last-sequence-number" : 1,
+  "last-updated-ms" : 1733739871311,
+  "last-column-id" : 5,
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "eic_code",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 2,
+      "name" : "price",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 3,
+      "name" : "currency_unit",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 4,
+      "name" : "price_measure_unit",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 5,
+      "name" : "datetime",
+      "required" : false,
+      "type" : "timestamp"
+    } ]
+  } ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "write.parquet.compression-codec" : "zstd"
+  },
+  "current-snapshot-id" : 4212128760059083770,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 4212128760059083770,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "sequence-number" : 1,
+    "snapshot-id" : 4212128760059083770,
+    "timestamp-ms" : 1733739871311,
+    "summary" : {
+      "operation" : "append",
+      "added-files-size" : "7558",
+      "added-data-files" : "1",
+      "added-records" : "991",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-records" : "991",
+      "total-files-size" : "7558",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "/iceberg/warehouse/price/metadata/snap-4212128760059083770-0-07ccbc60-90a4-4e58-a304-465c9837931c.avro",
+    "schema-id" : 0
+  } ],
+  "statistics" : [ ],
+  "partition-statistics" : [ ],
+  "snapshot-log" : [ {
+    "timestamp-ms" : 1733739871311,
+    "snapshot-id" : 4212128760059083770
+  } ],
+  "metadata-log" : [ {
+    "timestamp-ms" : 1733739871169,
+    "metadata-file" : "/iceberg/warehouse/price/metadata/00000-8e0f8ffb-3ef9-4d2b-ba66-59ce743c7df7.metadata.json"
+  } ]
+}

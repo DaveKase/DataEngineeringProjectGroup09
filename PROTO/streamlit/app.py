@@ -5,49 +5,73 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import matplotlib.ticker as mticker
 
+# ---- Configuration ----
+db_path = "/usr/app/data/combined_data.duckdb"
+
+# Green energy sources
+GREEN_SOURCES = ["Solar", "Biomass", "Wind Onshore", "Wind Offshore", "Geothermal", "Hydro Pumped Storage", "Hydro Run-of-river and poundage", "Hydro Water Reservoir", "Marine", "Other renewable"]
+
+# Weather options with formatting
+WEATHER_OPTIONS = {
+    "Temperature": "temperature",
+    "Relative Humidity": "relative_humidity",
+    "Wind Speed": "wind_speed",
+    "Precipitation": "precipitation",
+    "Solar Radiation": "solar_radiation",
+    "Sea Level Pressure": "sea_level_pressure"
+}
+
+# Weather units
+WEATHER_UNITS = {
+    "Temperature": "°C",
+    "Relative Humidity": "%",
+    "Wind Speed": "m/s",
+    "Precipitation": "mm",
+    "Solar Radiation": "W/m²",
+    "Sea Level Pressure": "mmHg"
+}
+
 # ---- Dashboard Title ----
 st.markdown(
     """
     <h1 style="text-align: center; font-size: 32px;">
         <span style="color: #03942c; font-weight: bold;">Renewable</span>
         <span style="color: #056fa3; font-weight: bold;">Energy</span><br>
-        <span style="font-size: 20px; font-weight: normal;">Production and Consumption in Northern Europe</span>
+        <span style="font-size: 20px; font-weight: normal;">Energy Production and Consumption Dashboard</span>
     </h1>
     """,
     unsafe_allow_html=True,
 )
 
 # ---- Connect to DuckDB ----
-db_path = "/usr/app/data/weather.duckdb"
 try:
-    weather = duckdb.connect(db_path, read_only=True)
+    conn = duckdb.connect(db_path, read_only=True)
 except Exception as e:
     st.error(f"Failed to connect to database: {e}")
     st.stop()
 
-# ---- Fetch Data for Filters ----
-# Query for date range and distinct countries
+# ---- Fetch Filters ----
 try:
-    date_query = """
-        SELECT MIN(date_time) AS min_date, MAX(date_time) AS max_date
-        FROM weather_cleaned
-    """
-    data_info = weather.execute(date_query).fetchone()
-    min_date, max_date = pd.to_datetime(data_info[0]), pd.to_datetime(data_info[1])
-    min_date, max_date = min_date.to_pydatetime(), max_date.to_pydatetime()
+    countries_query = "SELECT DISTINCT bzn FROM consumption_cleaned"
+    countries = sorted([row[0] for row in conn.execute(countries_query).fetchall()])
 
-    distinct_countries_query = """
-        SELECT DISTINCT bzn 
-        FROM weather_cleaned
+    date_query = """
+        SELECT MIN(datetime) AS min_date, MAX(datetime) AS max_date
+        FROM consumption_cleaned
     """
-    countries = sorted([row[0] for row in weather.execute(distinct_countries_query).fetchall()])  # Sort alphabetically
+    min_date, max_date = conn.execute(date_query).fetchone()
+    
+    # Ensure that min_date and max_date are datetime objects
+    min_date = pd.to_datetime(min_date).to_pydatetime()  # Convert to native Python datetime
+    max_date = pd.to_datetime(max_date).to_pydatetime()  # Convert to native Python datetime
 except Exception as e:
-    st.error(f"Failed to fetch filter data: {e}")
+    st.error(f"Failed to fetch filters: {e}")
     st.stop()
 
 # ---- Sidebar Filters ----
 st.sidebar.header("Filters")
 selected_country = st.sidebar.selectbox("Select a Country/Region", countries)
+
 date_range = st.sidebar.slider(
     "Select Date Range",
     min_value=min_date,
@@ -56,61 +80,158 @@ date_range = st.sidebar.slider(
     format="YYYY-MM-DD HH:mm"
 )
 
-# ---- Filtered Data Query ----
-filtered_query = f"""
-    SELECT date_time, temperature, solar_radiation
-    FROM weather_cleaned
-    WHERE bzn = '{selected_country}'
-      AND date_time BETWEEN '{date_range[0].strftime("%Y-%m-%d %H:%M:%S")}' AND '{date_range[1].strftime("%Y-%m-%d %H:%M:%S")}'
-    ORDER BY date_time
-"""
+# ---- User Selections ----
+st.sidebar.header("Plot Configuration")
+data_type = st.sidebar.radio("Select Data Type", ["Consumption", "Production"])
+
+secondary_axis = st.sidebar.radio("Select Secondary Y-Axis", ["Price", "Weather"])
+weather_param = None
+if secondary_axis == "Weather":
+    weather_param = st.sidebar.selectbox("Select Weather Parameter", list(WEATHER_OPTIONS.keys()))
+
+# ---- Query Data ----
 try:
-    filtered_data = weather.execute(filtered_query).fetchdf()
+    # Base query based on selected data type
+    if data_type == "Consumption":
+        query = f"""
+            SELECT datetime, quantity
+            FROM consumption_cleaned
+            WHERE bzn = '{selected_country}'
+              AND datetime BETWEEN '{date_range[0]}' AND '{date_range[1]}'
+            ORDER BY datetime
+        """
+    else:
+        query = f"""
+            SELECT datetime, quantity, produced_energy_type
+            FROM production_cleaned
+            WHERE bzn = '{selected_country}'
+              AND datetime BETWEEN '{date_range[0]}' AND '{date_range[1]}'
+            ORDER BY datetime
+        """
+    
+    data = conn.execute(query).fetchdf()
+    
+    time_diff = (data["datetime"].iloc[1] - data["datetime"].iloc[0]).total_seconds() / 3600  # Difference in hours
+    if time_diff <= 0.25:  # If the interval is 15 minutes or less
+        bar_width = 0.0095
+    else:  # For hourly or larger intervals
+        bar_width = 0.04
+
+    # Fetch secondary axis data
+    if secondary_axis == "Price":
+        price_query = f"""
+            SELECT datetime, price
+            FROM price_cleaned
+            WHERE bzn = '{selected_country}'
+              AND datetime BETWEEN '{date_range[0]}' AND '{date_range[1]}'
+            ORDER BY datetime
+        """
+        price_data = conn.execute(price_query).fetchdf()
+    elif secondary_axis == "Weather" and weather_param:
+        weather_column = WEATHER_OPTIONS[weather_param]  # Get the column name for weather parameter
+        weather_query = f"""
+            SELECT date_time, {weather_column} AS weather_value
+            FROM weather_cleaned
+            WHERE bzn = '{selected_country}'
+              AND date_time BETWEEN '{date_range[0]}' AND '{date_range[1]}'
+            ORDER BY date_time
+        """
+        weather_data = conn.execute(weather_query).fetchdf()
+
+        # If the selected weather parameter is "Wind_speed", divide by 3.6
+        if weather_param == "Wind Speed":
+            weather_data["weather_value"] = weather_data["weather_value"] / 3.6
+        
 except Exception as e:
-    st.error(f"Failed to fetch filtered data: {e}")
+    st.error(f"Failed to fetch data: {e}")
     st.stop()
 
+# ---- Data Preprocessing ----
+# Drop any rows with missing values in datetime or quantity columns
+data.dropna(subset=["datetime", "quantity"], inplace=True)
+
+# Ensure both datetime and quantity have the same length
+if len(data["datetime"]) != len(data["quantity"]):
+    st.error("Mismatch between datetime and quantity columns. Please check the data.")
+    st.stop()
+
+# ---- Handle Stacking of Green and Non-Green Data (only for production) ----
+if data_type == "Production":
+    # Split data into green and non-green energy sources
+    green_data = data[data["produced_energy_type"].isin(GREEN_SOURCES)]
+    non_green_data = data[~data["produced_energy_type"].isin(GREEN_SOURCES)]
+
+    # Aggregate by datetime for proper stacking
+    green_data = green_data.groupby("datetime", as_index=False).sum()
+    non_green_data = non_green_data.groupby("datetime", as_index=False).sum()
+
 # ---- Plot the Data ----
-if not filtered_data.empty:
-    fig, ax1 = plt.subplots(figsize=(12, 6))
+if not data.empty:
+    fig, ax1 = plt.subplots(figsize=(14, 10))
 
-    # Convert date_time to datetime
-    filtered_data["date_time"] = pd.to_datetime(filtered_data["date_time"])
+    # Plot consumption as bars
+    
+    # Determine the time interval and adjust bar width accordingly
+    time_diff = (data["datetime"].iloc[1] - data["datetime"].iloc[0]).total_seconds() / 3600  # Difference in hours
+    if time_diff <= 0.25:  # If the interval is 15 minutes or less
+        bar_width = 0.0095
+    else:  # For hourly or larger intervals
+        bar_width = 0.04
+        
+    if data_type == "Consumption":
+        ax1.bar(data["datetime"], data["quantity"], color="#056fa3", alpha=0.55, width=bar_width)  # Adjust width based on interval
+        ax1.set_ylabel("Consumption (MWh)", fontsize = 16)
+        ax1.set_title(f"Consumption in {selected_country}", fontsize = 20)  # Title with country and date range
 
-    # Plot temperature with different colors based on regions
-    for i in range(len(filtered_data) - 1):
-        x = filtered_data["date_time"].iloc[i : i + 2]
-        y = filtered_data["temperature"].iloc[i : i + 2]
-        color = "red" if y.mean() >= 0 else "#07a4f2"
-        ax1.plot(x, y, color=color, linewidth=2)
+    # Plot production as stacked bars
+    elif data_type == "Production":
+        
+        time_diff = (non_green_data["datetime"].iloc[1] - non_green_data["datetime"].iloc[0]).total_seconds() / 3600  # Difference in hours
+        if time_diff <= 0.25:  # If the interval is 15 minutes or less
+            bar_width = 0.0095
+        else:  # For hourly or larger intervals
+            bar_width = 0.04
+        
+        # Plot non-green energy bars first (bottom part of the stack)
+        ax1.bar(
+            non_green_data["datetime"], non_green_data["quantity"], color="grey", alpha=0.7, width=bar_width, label="Other Energy"
+        )
+        
+        time_diff = (green_data["datetime"].iloc[1] - green_data["datetime"].iloc[0]).total_seconds() / 3600  # Difference in hours
+        if time_diff <= 0.25:  # If the interval is 15 minutes or less
+            bar_width = 0.0095
+        else:  # For hourly or larger intervals
+            bar_width = 0.04
+            
+        # Plot green energy bars on top of the non-green energy bars
+        ax1.bar(
+            green_data["datetime"], green_data["quantity"], color="green", alpha=0.7, width=bar_width, bottom=non_green_data["quantity"], label="Renewable Energy"
+        )
 
-    # Set y-axis label for temperature
-    ax1.set_ylabel("Temperature (°C)")
-    ax1.tick_params(axis="y")  # Default black ticks for Y-axis
+        ax1.set_ylabel("Production (MWh)", fontsize = 16)
+        ax1.set_title(f"Production in {selected_country}", fontsize = 20)  # Title with country and date range
 
-    # Ensure y-axis tick values are integers
-    ax1.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+    # Plot secondary axis
+    if secondary_axis == "Price" and not price_data.empty:
+        ax2 = ax1.twinx()
+        ax2.plot(price_data["datetime"], price_data["price"], color="orange", label="Price (€/MWh)", linewidth=3)
+        ax2.set_ylabel("Price (€/MWh)", color="orange", fontsize = 16)
+        ax2.tick_params(axis='y', labelsize=14)
+    elif secondary_axis == "Weather" and weather_param and not weather_data.empty:
+        ax2 = ax1.twinx()
+        ax2.plot(
+            weather_data["date_time"], weather_data["weather_value"], color="darkred", label=weather_param, linewidth=3
+        )
+        ax2.set_ylabel(f"{weather_param} ({WEATHER_UNITS[weather_param]})", color="darkred", fontsize = 16)  # Add units to ylabel
+        ax2.tick_params(axis='y', labelsize=14)
+        
+    # Show legend for green and non-green energy
+    ax1.legend(loc="upper left", fontsize = 14)
 
-    # Add second y-axis for solar radiation
-    ax2 = ax1.twinx()
-    ax2.plot(
-        filtered_data["date_time"],
-        filtered_data["solar_radiation"],
-        label="Solar Radiation (W/m²)",
-        color="orange",
-        linewidth=2  # Thicker line
-    )
-    ax2.set_ylabel("Solar Radiation (W/m²)", color="orange")  # Set label color to orange
-    ax2.tick_params(axis="y")  # Default black ticks for Y-axis
-
-    # Format x-axis with hours and minutes in the first row
-    ax1.xaxis.set_major_formatter(DateFormatter('%H:%M\n%Y-%m-%d'))
-
-    # Remove x-axis label
-    ax1.set_xlabel(None)
-
-    # Adjust layout
-    fig.tight_layout()
+    ax1.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d\n%H:%M'))
+    ax1.tick_params(axis='x', labelsize=14)
+    ax1.tick_params(axis='y', labelsize=14)
+    fig.autofmt_xdate()
     st.pyplot(fig)
 else:
     st.warning("No data available for the selected filters.")

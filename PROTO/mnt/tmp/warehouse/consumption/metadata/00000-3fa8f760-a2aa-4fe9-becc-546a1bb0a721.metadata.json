@@ -1,0 +1,55 @@
+{
+  "format-version" : 2,
+  "table-uuid" : "bc8bd061-74ca-4844-bf2f-9ffdc8816d11",
+  "location" : "/iceberg/warehouse/consumption",
+  "last-sequence-number" : 0,
+  "last-updated-ms" : 1733740995736,
+  "last-column-id" : 4,
+  "current-schema-id" : 0,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "eic_code",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 2,
+      "name" : "quantity",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 3,
+      "name" : "unit",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 4,
+      "name" : "datetime",
+      "required" : false,
+      "type" : "timestamp"
+    } ]
+  } ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "write.parquet.compression-codec" : "zstd"
+  },
+  "current-snapshot-id" : -1,
+  "refs" : { },
+  "snapshots" : [ ],
+  "statistics" : [ ],
+  "partition-statistics" : [ ],
+  "snapshot-log" : [ ],
+  "metadata-log" : [ ]
+}

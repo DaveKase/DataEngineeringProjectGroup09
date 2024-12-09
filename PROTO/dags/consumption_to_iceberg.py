@@ -25,7 +25,6 @@ def fetch_and_process(**context):
     df_csv = pd.read_csv('/opt/airflow/config_files/country_code_mapper.csv')
     bidding_zones = df_csv['EIC'].dropna().str.strip().tolist()
 
-
     # Parse dates from the JSON file
     with open('/opt/airflow/config_files/config_dates.json', 'r') as f:
         config = json.load(f)
@@ -44,7 +43,7 @@ def fetch_and_process(**context):
 
     # Namespace for XML parsing
     namespaces = {
-        'ns': 'urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3'
+        "ns": "urn:iec62325.351:tc57wg16:451-6:generationloaddocument:3:0"
     }
 
     # Data collection
@@ -52,15 +51,13 @@ def fetch_and_process(**context):
     # Loop through bidding_zones and time periods
     for bidding_zone in bidding_zones:
         for period_start, period_end in time_periods:
-            # API request parameters
             params = {
-                "documentType": "A44",
-                "out_Domain": bidding_zone,
-                "in_Domain": bidding_zone,
-                "periodStart": period_start,
-                "periodEnd": period_end,
-                "contract_MarketAgreement.type": 'A01',
                 "securityToken": API_KEY,
+                "documentType": "A65",
+                "processType": "A16",
+                "outBiddingZone_Domain": bidding_zone,
+                "periodStart": period_start,
+                "periodEnd": period_end
             }
 
             # Send API request
@@ -73,36 +70,28 @@ def fetch_and_process(**context):
             root = ET.fromstring(response.text)
 
             # Iterate over TimeSeries elements
-            for time_series in root.findall('.//ns:TimeSeries', namespaces=namespaces):
-                currency_unit = time_series.find('.//ns:currency_Unit.name', namespaces=namespaces).text
-                price_measure_unit = time_series.find('.//ns:price_Measure_Unit.name', namespaces=namespaces).text
-                resolution = time_series.find('.//ns:Period//ns:resolution', namespaces=namespaces).text
-                EIC_code_out = time_series.find('.//ns:out_Domain.mRID', namespaces=namespaces).text
-                start_time_str = time_series.find('.//ns:Period//ns:timeInterval//ns:start', namespaces=namespaces).text
-                end_time_str = time_series.find('.//ns:Period//ns:timeInterval//ns:end', namespaces=namespaces).text
+            resolution = root.find(".//ns:resolution", namespaces).text
+            start_time = pd.to_datetime(root.find(".//ns:timeInterval/ns:start", namespaces).text)
+            end_time = pd.to_datetime(root.find(".//ns:timeInterval/ns:end", namespaces).text)
+            bidding_zone = root.find(".//ns:outBiddingZone_Domain.mRID", namespaces).text
+            quantity_measure_unit = root.find(".//ns:quantity_Measure_Unit.name", namespaces).text
+            points = root.findall(".//ns:Point", namespaces)
+            
+            for point in points:
+                position = int(point.find("ns:position", namespaces).text)
+                quantity = float(point.find("ns:quantity", namespaces).text)
                 
-                # Convert to datetime objects
-                start_time = datetime.strptime(start_time_str, "%Y-%m-%dT%H:%MZ")
-                end_time = datetime.strptime(end_time_str, "%Y-%m-%dT%H:%MZ")
-
-                # Extract Points
-                for point in time_series.findall('.//ns:Period//ns:Point', namespaces=namespaces):
-                    position = int(point.find('ns:position', namespaces=namespaces).text)
-                    price = float(point.find('ns:price.amount', namespaces=namespaces).text)
-
-                    # Append to data list
-                    data.append({
-                        'eic_code': EIC_code_out,
-                        'price': price,
-                        'currency_unit': currency_unit,
-                        'price_measure_unit': price_measure_unit,
-                        'resolution': resolution,
-                        'position': position,
-                        'start_time': start_time,
-                        'end_time': end_time,
-                    })
-
-    # Convert collected data to DataFrame
+                data.append({
+                "eic_code": bidding_zone,
+                "quantity": quantity,
+                "unit": quantity_measure_unit,
+                "resolution": resolution,
+                "position": position,
+                "start_time": start_time,
+                "end_time": end_time,
+                })
+                
+    # Create DataFrame with all data
     df = pd.DataFrame(data)
 
     # Calculate the duration_from_start
@@ -120,22 +109,27 @@ def fetch_and_process(**context):
     df['datetime'] = df['start_time'] + df['duration_from_start']
     # Drop unnecessary columns
     df = df.drop(columns=['resolution', 'position', 'start_time', 'end_time', 'duration_from_start'])
-    df.to_csv('/mnt/tmp/csv_data/price.csv')
+    
+    df.to_csv('/mnt/tmp/csv_data/consumption.csv')
+    
     return df
 
 
 def save_to_iceberg(**context):
     # Load the Iceberg REST catalog
     catalog = load_catalog("rest", uri="http://iceberg_rest:8181")
-    table_name = "price.data"
-    iceberg_directory = "/iceberg/warehouse/price"
+    table_name = "consumption.data"
+    iceberg_directory = "/iceberg/warehouse/consumption"
 
     # Load processed data
-    df_path = '/mnt/tmp/csv_data/price.csv'
+    df_path = '/mnt/tmp/csv_data/consumption.csv'
     df = pd.read_csv(df_path, parse_dates=['datetime'])
 
     # Drop the unnecessary "Unnamed: 0" column, which is the index column in csv
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    
+    # Remove timezone information from the datetime column
+    df['datetime'] = df['datetime'].dt.tz_localize(None)
     
     # Downcast datetime to microsecond precision
     df['datetime'] = df['datetime'].astype('datetime64[us]')
@@ -146,10 +140,9 @@ def save_to_iceberg(**context):
     # Define the schema for the Iceberg table
     iceberg_schema = Schema(
         NestedField(1, 'eic_code', StringType(), required=False),
-        NestedField(2, 'price', DoubleType(), required=False),
-        NestedField(3, 'currency_unit', StringType(), required=False),
-        NestedField(4, 'price_measure_unit', StringType(), required=False),
-        NestedField(5, 'datetime', TimestampType(), required=False)
+        NestedField(2, 'quantity', DoubleType(), required=False),
+        NestedField(3, 'unit', StringType(), required=False),
+        NestedField(4, 'datetime', TimestampType(), required=False)
     )
     # Check if the Iceberg table exists
     try:
@@ -171,7 +164,7 @@ def save_to_iceberg(**context):
 
 # Define the DAG
 with DAG(
-    dag_id="price_to_iceberg",
+    dag_id="consumption_to_iceberg",
     default_args={
         'owner': 'airflow',
         'start_date': datetime(2024, 1, 1),
@@ -184,7 +177,7 @@ with DAG(
 
     # Task 1: Fetch weather data
     fetch_data = PythonOperator(
-        task_id='fetch_price_data',
+        task_id='fetch_consumption_data',
         python_callable=fetch_and_process
     )
 

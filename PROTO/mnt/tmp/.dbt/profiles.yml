@@ -1,26 +1,8 @@
 data_engineering_project:
-  target: cleaned_weather
+  target: combined
   outputs:
-    cleaned_weather:
+    combined:
       type: duckdb
       threads: 1
-      # Path to the weather DuckDB database
-      path: "/usr/app/mnt/tmp/duckdb_data/weather.duckdb"
-
-    #price:
-      #type: duckdb
-      #threads: 1
-      #database: /path/to/your/price.duckdb
-
-    #production:
-      #type: duckdb
-      #threads: 1
-      #database: /path/to/your/production.duckdb
-
-    #consumption:
-      #type: duckdb
-      #threads: 1
-      #database: /path/to/your/consumption.duckdb
-
-  # Default target
-  #target: weather  # Change this to whichever profile you want as default
+      # Path to the combined DuckDB database
+      path: "./mnt/tmp/duckdb_data/combined_data.duckdb"
