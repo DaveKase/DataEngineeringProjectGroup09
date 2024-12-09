@@ -1,15 +1,29 @@
 import streamlit as st
 import duckdb
 import pandas as pd
+import geopandas as gpd
+import folium
+from streamlit_folium import st_folium
+from branca.colormap import LinearColormap
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import matplotlib.ticker as mticker
 
 # ---- Configuration ----
 db_path = "/usr/app/data/combined_data.duckdb"
+geojson_url = "https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json"
 
 # Green energy sources
-GREEN_SOURCES = ["Solar", "Biomass", "Wind Onshore", "Wind Offshore", "Geothermal", "Hydro Pumped Storage", "Hydro Run-of-river and poundage", "Hydro Water Reservoir", "Marine", "Other renewable"]
+GREEN_SOURCES = ["Solar", "Biomass", "Wind Onshore", "Wind Offshore", "Geothermal", "Hydro Pumped Storage", 
+                 "Hydro Run-of-river and poundage", "Hydro Water Reservoir", "Marine", "Other renewable"]
+
+# Mapping BZN codes to country names
+BZN_TO_COUNTRY = {
+    "EE": "Estonia", "LV": "Latvia", "LT": "Lithuania", "FI": "Finland",
+    "SE1": "Sweden", "SE2": "Sweden", "SE3": "Sweden", "SE4": "Sweden", 
+    "NO1": "Norway", "NO2": "Norway", "NO3": "Norway", "NO4": "Norway", "NO5": "Norway",
+    "DK1": "Denmark", "DK2": "Denmark", "DE-LU": "Germany", "PL": "Poland"
+}
 
 # Weather options with formatting
 WEATHER_OPTIONS = {
@@ -18,7 +32,7 @@ WEATHER_OPTIONS = {
     "Wind Speed": "wind_speed",
     "Precipitation": "precipitation",
     "Solar Radiation": "solar_radiation",
-    "Sea Level Pressure": "sea_level_pressure"
+    "Air Pressure": "sea_level_pressure"
 }
 
 # Weather units
@@ -28,7 +42,7 @@ WEATHER_UNITS = {
     "Wind Speed": "m/s",
     "Precipitation": "mm",
     "Solar Radiation": "W/m²",
-    "Sea Level Pressure": "mmHg"
+    "Air Pressure": "mmHg"
 }
 
 # ---- Dashboard Title ----
@@ -235,3 +249,113 @@ if not data.empty:
     st.pyplot(fig)
 else:
     st.warning("No data available for the selected filters.")
+
+
+# ---- Date Slider Above Map ----
+#st.header("Green Energy Proportion Map")
+
+# ---- Query Unique Hourly Datetimes ----
+try:
+    datetime_query = """
+        SELECT DISTINCT datetime
+        FROM production_cleaned
+        WHERE EXTRACT(MINUTE FROM datetime) = 0  -- Only include hourly data
+        ORDER BY datetime
+    """
+    available_datetimes = conn.execute(datetime_query).fetchdf()["datetime"].to_list()
+
+    # Convert to Python datetime objects
+    available_datetimes = [
+        pd.Timestamp(ts).to_pydatetime() for ts in available_datetimes
+    ]
+except Exception as e:
+    st.error(f"Failed to fetch available hourly datetimes: {e}")
+    st.stop()
+
+# Adjust slider for hourly datetimes only
+if available_datetimes:
+    selected_datetime = st.select_slider(
+        "",
+        options=available_datetimes,
+        value=min(available_datetimes),  # Default to the earliest time
+    )
+else:
+    st.error("No hourly data available.")
+    st.stop()
+
+# ---- Query Energy Data ----
+try:
+    energy_query = f"""
+        SELECT bzn, SUM(CASE WHEN produced_energy_type IN ({','.join([f"'{s}'" for s in GREEN_SOURCES])})
+                    THEN quantity ELSE 0 END) / SUM(quantity) AS green_proportion
+        FROM production_cleaned
+        WHERE datetime = '{selected_datetime}'
+        GROUP BY bzn
+    """
+    energy_data = conn.execute(energy_query).fetchdf()
+    # Map BZN to country names
+    energy_data["country"] = energy_data["bzn"].map(BZN_TO_COUNTRY)
+
+    # Aggregate by country (average green proportion)
+    country_data = (
+        energy_data.groupby("country")["green_proportion"]
+        .mean()
+        .reset_index()
+    )
+    
+    # Ensure all countries in BZN_TO_COUNTRY are represented
+    all_countries = pd.DataFrame({"country": list(BZN_TO_COUNTRY.values())})
+    country_data = all_countries.merge(
+        country_data, on="country", how="left"
+    ).fillna(0)  # Fill missing proportions with 0
+except Exception as e:
+    st.error(f"Failed to fetch energy data: {e}")
+    st.stop()
+
+# ---- Download and Load GeoJSON ----
+try:
+    geodata = gpd.read_file(geojson_url)
+except Exception as e:
+    st.error(f"Failed to load GeoJSON data: {e}")
+    st.stop()
+
+# ---- Merge GeoJSON with Energy Data ----
+geodata = geodata.merge(country_data, left_on="name", right_on="country", how="left")
+
+# ---- Create the Interactive Map ----
+# Define a custom linear colormap
+colormap = LinearColormap(
+    colors=["#f3f5d7", "#addd8e", "#1c6304"],
+    vmin=0,
+    vmax=1,
+    caption="Proportion of Renewable Energy"
+)
+
+# Create the map
+m = folium.Map(location=[57.52, 16.5], zoom_start=4,
+               tiles="https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+                attr="CartoDB Positron Lite (No Labels)")  # Centered roughly on Northern Europe
+
+# Add GeoJSON with style based on green energy proportion
+folium.GeoJson(
+    geodata,
+    style_function=lambda feature: {
+        "fillColor": colormap(feature["properties"]["green_proportion"])
+        if feature["properties"]["green_proportion"] is not None else "#dfe0de",
+        "color": "black",
+        "weight": 0.5,
+        "fillOpacity": 0.9,
+    },
+    tooltip=folium.GeoJsonTooltip(
+        fields=["name", "green_proportion"],
+        aliases=["Country", "Renewable Energy Proportion"],
+        localize=True,
+    )
+).add_to(m)
+
+# Add the colormap to the map (legend moved to bottom left)
+colormap.add_to(m)
+colormap.caption_style = {"bottom": "10px", "left": "10px"}
+
+# Display the map
+st_folium(m, width=700, height=400)
