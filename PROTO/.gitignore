@@ -10,3 +10,12 @@ PROTO/mnt/tmp/duckdb_data/*
 PROTO/mnt/tmp/warehouse/weather/*
 PROTO/mnt/tmp/warehouse/weather/*.json
 !PROTO/mnt/tmp/warehouse/weather/.gitkeep
+
+PROTO/mnt/tmp/warehouse/price/*
+!PROTO/mnt/tmp/warehouse/price/.gitkeep
+
+PROTO/mnt/tmp/warehouse/production/*
+!PROTO/mnt/tmp/warehouse/production/.gitkeep
+
+PROTO/mnt/tmp/warehouse/consumption/*
+!PROTO/mnt/tmp/warehouse/consumption/.gitkeep
