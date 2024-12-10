@@ -30,7 +30,7 @@ def fetch_and_process(**context):
     with open('/opt/airflow/config_files/config_dates.json', 'r') as f:
         config = json.load(f)
     start_date = datetime.strptime(config["start_date"], "%Y-%m-%d")
-    end_date = datetime.strptime(config["end_date"], "%Y-%m-%d")
+    end_date = datetime.strptime(config["end_date"], "%Y-%m-%d") + timedelta(days=1)  # Include the entire day
     period_duration = timedelta(days=31)  # Example: one-month intervals
     
     print(start_date, end_date)

@@ -31,6 +31,7 @@ x-airflow-common: &airflow-common
     - ./mnt/tmp/warehouse:/iceberg/warehouse  # Access to Iceberg warehouse
     - ./mnt/tmp/warehouse:/mnt/tmp/warehouse # DuckDB access
     - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket for Airflow services
+  command: bash -c "chown -R airflow:root /opt/airflow/logs && chmod -R 777 /opt/airflow/logs && airflow scheduler"
   user: "${AIRFLOW_UID:-50000}:0"
   networks:
     - airflow_network
@@ -70,6 +71,23 @@ services:
     networks:
       - airflow_network
 
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db init
+        airflow users create \
+          --username "${_AIRFLOW_WWW_USER_USERNAME}" \
+          --password "${_AIRFLOW_WWW_USER_PASSWORD}" \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com
+    user: "0:0"
+    restart: on-failure
+  
   airflow-webserver:
     <<: *airflow-common
     command: webserver
@@ -121,23 +139,6 @@ services:
       retries: 5
       start_period: 30s
     restart: always
-
-  airflow-init:
-    <<: *airflow-common
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        airflow db init
-        airflow users create \
-          --username "${_AIRFLOW_WWW_USER_USERNAME}" \
-          --password "${_AIRFLOW_WWW_USER_PASSWORD}" \
-          --firstname Admin \
-          --lastname User \
-          --role Admin \
-          --email admin@example.com
-    user: "0:0"
-    restart: on-failure
 
   duckdb:
     container_name: duckdb

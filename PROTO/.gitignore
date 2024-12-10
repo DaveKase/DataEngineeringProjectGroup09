@@ -2,6 +2,11 @@
 PROTO/.env
 .env
 
+# Ignore other files and directories
+logs/
+*.log
+__pycache__/
+
 # Ignore contents of duckdb_data folder but keep the folder itself
 PROTO/mnt/tmp/duckdb_data/*
 !PROTO/mnt/tmp/duckdb_data/.gitkeep

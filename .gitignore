@@ -1,7 +1,0 @@
-# Ignore the .env file
-.env
-
-# Ignore other files and directories
-logs/
-*.log
-__pycache__/

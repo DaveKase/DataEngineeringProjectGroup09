@@ -32,6 +32,24 @@ RUN arch=$(dpkg --print-architecture) && \
     chmod +x /usr/local/bin/duckdb && \
     rm duckdb.zip
 
+RUN mkdir -p /opt/airflow/log/scheduler
+RUN chmod -R 777 /opt/airflow/log/scheduler
+RUN mkdir -p /opt/airflow/logs/scheduler
+RUN chmod -R 777 /opt/airflow/logs/scheduler
+
+RUN chown -R airflow:root /opt/airflow/logs
+RUN chown -R airflow:root /opt/airflow/log
+
+RUN chown -R airflow:root /opt/airflow/log/scheduler
+RUN chown -R airflow:root /opt/airflow/logs/scheduler
+
+RUN mkdir -p /opt/airflow/logs/scheduler/2024-12-10
+RUN chmod -R 777 /opt/airflow/logs/scheduler/2024-12-10
+RUN chown -R airflow:root /opt/airflow/logs/scheduler/2024-12-10
+
+# Add airflow user to root group
+RUN usermod -aG root airflow
+
 USER airflow
 
 # Upgrade pip to the latest version before installing PyIceberg
