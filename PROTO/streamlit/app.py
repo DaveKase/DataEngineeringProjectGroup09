@@ -5,6 +5,7 @@ import geopandas as gpd
 import folium
 from streamlit_folium import st_folium
 from branca.colormap import LinearColormap
+from branca.element import Template, MacroElement
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import matplotlib.ticker as mticker
@@ -45,14 +46,15 @@ WEATHER_UNITS = {
     "Air Pressure": "mmHg"
 }
 
+st.set_page_config(layout="wide")
 
 # ---- Dashboard Title ----
 st.markdown(
     """
-    <h1 style="text-align: center; font-size: 40px;">
+    <h1 style="text-align: center; font-size: 50px; margin-top: -45px;">
         <span style="color: #03942c; font-weight: bold;">Renewable</span>
         <span style="color: #056fa3; font-weight: bold;">Energy</span><br>
-        <span style="font-size: 20px; font-weight: normal;">Production and Consumption in Northern Europe</span>
+        <span style="font-size: 22px; font-weight: normal;">Production and Consumption in Northern Europe</span>
     </h1>
     """,
     unsafe_allow_html=True,
@@ -193,7 +195,7 @@ if data_type == "Production":
 
 # ---- Plot the Data ----
 if not data.empty:
-    fig, ax1 = plt.subplots(figsize=(14, 10))
+    fig, ax1 = plt.subplots(figsize=(14, 6))
 
     # Plot consumption as bars
     
@@ -206,8 +208,8 @@ if not data.empty:
         
     if data_type == "Consumption":
         ax1.bar(data["datetime"], data["quantity"], color="#056fa3", alpha=0.55, width=bar_width)  # Adjust width based on interval
-        ax1.set_ylabel("Consumption (MWh)", fontsize = 16)
-        ax1.set_title(f"Consumption in {selected_country}", fontsize = 20)  # Title with country and date range
+        ax1.set_ylabel("Consumption (MWh)", fontsize = 14)
+        ax1.set_title(f"Energy Consumption in {selected_country}", fontsize = 16)  # Title with country and date range
 
     # Plot production as stacked bars
     elif data_type == "Production":
@@ -234,29 +236,31 @@ if not data.empty:
             green_data["datetime"], green_data["quantity"], color="green", alpha=0.7, width=bar_width, bottom=non_green_data["quantity"], label="Renewable Energy"
         )
 
-        ax1.set_ylabel("Production (MWh)", fontsize = 16)
-        ax1.set_title(f"Production in {selected_country}", fontsize = 20)  # Title with country and date range
+        ax1.set_ylabel("Production (MWh)", fontsize = 14)
+        ax1.set_title(f"Energy Production in {selected_country}", fontsize = 16)  # Title with country and date range
 
     # Plot secondary axis
     if secondary_axis == "Price" and not price_data.empty:
         ax2 = ax1.twinx()
         ax2.plot(price_data["datetime"], price_data["price"], color="orange", label="Price (€/MWh)", linewidth=3)
-        ax2.set_ylabel("Price (€/MWh)", color="orange", fontsize = 16)
-        ax2.tick_params(axis='y', labelsize=14)
+        ax2.set_ylabel("Price (€/MWh)", color="orange", fontsize = 14)
+        ax2.tick_params(axis='y', labelsize=12)
+        ax2.set_ylim(bottom=0)
     elif secondary_axis == "Weather" and weather_param and not weather_data.empty:
         ax2 = ax1.twinx()
         ax2.plot(
             weather_data["date_time"], weather_data["weather_value"], color="darkred", label=weather_param, linewidth=3
         )
-        ax2.set_ylabel(f"{weather_param} ({WEATHER_UNITS[weather_param]})", color="darkred", fontsize = 16)  # Add units to ylabel
-        ax2.tick_params(axis='y', labelsize=14)
+        ax2.set_ylabel(f"{weather_param} ({WEATHER_UNITS[weather_param]})", color="darkred", fontsize = 14)  # Add units to ylabel
+        ax2.tick_params(axis='y', labelsize=12)
+        #ax2.set_ylim(bottom=0)
         
     # Show legend for green and non-green energy
-    ax1.legend(loc="upper left", fontsize = 14)
+    ax1.legend(loc="lower left", fontsize = 14)
 
     ax1.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d\n%H:%M'))
-    ax1.tick_params(axis='x', labelsize=14)
-    ax1.tick_params(axis='y', labelsize=14)
+    ax1.tick_params(axis='x', labelsize=12)
+    ax1.tick_params(axis='y', labelsize=12)
     fig.autofmt_xdate()
     st.pyplot(fig)
 else:
@@ -327,6 +331,7 @@ except Exception as e:
 # ---- Download and Load GeoJSON ----
 try:
     geodata = gpd.read_file(geojson_url)
+    geodata = geodata[geodata["name"].isin(BZN_TO_COUNTRY.values())]
 except Exception as e:
     st.error(f"Failed to load GeoJSON data: {e}")
     st.stop()
@@ -344,7 +349,7 @@ colormap = LinearColormap(
 )
 
 # Create the map
-m = folium.Map(location=[57.52, 16.5], zoom_start=4,
+m = folium.Map(location=[62, 16.5], zoom_start=3,
                tiles="https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
                 attr="CartoDB Positron Lite (No Labels)")  # Centered roughly on Northern Europe
 
@@ -367,16 +372,15 @@ folium.GeoJson(
 
 # Add the colormap to the map (legend moved to bottom left)
 colormap.add_to(m)
-colormap.caption_style = {"bottom": "10px", "left": "10px"}
 
 # Display the map
-st_folium(m, width=700, height=400)
+st_folium(m, width=950, height=400)
 
 # Add the final text under the map
 st.markdown(
     """
     <p style="font-size: 12px; font-style: italic; text-align: center; margin-top: -30px;">
-        For the sake of plotting simplicity, the share of renewable energy in regions of Norway, Sweden, and Denmark has been averaged.
+        For the sake of plotting simplicity, the share of renewable energy in different regions of Norway, Sweden and Denmark has been averaged.
     </p>
     """,
     unsafe_allow_html=True,
