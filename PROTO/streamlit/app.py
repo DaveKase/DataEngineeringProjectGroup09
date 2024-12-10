@@ -245,6 +245,7 @@ if not data.empty:
         ax2.plot(price_data["datetime"], price_data["price"], color="orange", label="Price (€/MWh)", linewidth=3)
         ax2.set_ylabel("Price (€/MWh)", color="orange", fontsize = 14)
         ax2.tick_params(axis='y', labelsize=12)
+        ax2.set_ylim(bottom=0)
     elif secondary_axis == "Weather" and weather_param and not weather_data.empty:
         ax2 = ax1.twinx()
         ax2.plot(
@@ -252,6 +253,7 @@ if not data.empty:
         )
         ax2.set_ylabel(f"{weather_param} ({WEATHER_UNITS[weather_param]})", color="darkred", fontsize = 14)  # Add units to ylabel
         ax2.tick_params(axis='y', labelsize=12)
+        #ax2.set_ylim(bottom=0)
         
     # Show legend for green and non-green energy
     ax1.legend(loc="lower left", fontsize = 14)
