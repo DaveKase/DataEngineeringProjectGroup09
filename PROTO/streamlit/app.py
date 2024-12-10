@@ -49,10 +49,10 @@ WEATHER_UNITS = {
 # ---- Dashboard Title ----
 st.markdown(
     """
-    <h1 style="text-align: center; font-size: 32px;">
+    <h1 style="text-align: center; font-size: 40px;">
         <span style="color: #03942c; font-weight: bold;">Renewable</span>
         <span style="color: #056fa3; font-weight: bold;">Energy</span><br>
-        <span style="font-size: 20px; font-weight: normal;">Energy Production and Consumption Dashboard</span>
+        <span style="font-size: 20px; font-weight: normal;">Production and Consumption in Northern Europe</span>
     </h1>
     """,
     unsafe_allow_html=True,
@@ -371,3 +371,13 @@ colormap.caption_style = {"bottom": "10px", "left": "10px"}
 
 # Display the map
 st_folium(m, width=700, height=400)
+
+# Add the final text under the map
+st.markdown(
+    """
+    <p style="font-size: 12px; font-style: italic; text-align: center; margin-top: -30px;">
+        For the sake of plotting simplicity, the share of renewable energy in regions of Norway, Sweden, and Denmark has been averaged.
+    </p>
+    """,
+    unsafe_allow_html=True,
+)
