@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   airflow_network:
     driver: bridge
@@ -31,7 +29,6 @@ x-airflow-common: &airflow-common
     - ./mnt/tmp/warehouse:/iceberg/warehouse  # Access to Iceberg warehouse
     - ./mnt/tmp/warehouse:/mnt/tmp/warehouse # DuckDB access
     - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket for Airflow services
-  command: bash -c "chown -R airflow:root /opt/airflow/logs && chmod -R 777 /opt/airflow/logs && airflow scheduler"
   user: "${AIRFLOW_UID:-50000}:0"
   networks:
     - airflow_network
@@ -88,6 +85,22 @@ services:
     user: "0:0"
     restart: on-failure
   
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    # volumes:
+    #   - /var/run/docker.sock:/var/run/docker.sock
+    user: "${AIRFLOW_UID:-50000}:0"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8793/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      - airflow-init
+    restart: always
+
   airflow-webserver:
     <<: *airflow-common
     command: webserver
@@ -97,19 +110,6 @@ services:
       - "8080:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: always
-
-  airflow-scheduler:
-    <<: *airflow-common
-    command: scheduler
-    # volumes:
-    #   - /var/run/docker.sock:/var/run/docker.sock
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8793/health"]
       interval: 30s
       timeout: 10s
       retries: 5
