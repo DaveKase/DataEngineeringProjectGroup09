@@ -45,6 +45,7 @@ WEATHER_UNITS = {
     "Air Pressure": "mmHg"
 }
 
+
 # ---- Dashboard Title ----
 st.markdown(
     """
@@ -69,30 +70,41 @@ try:
     countries_query = "SELECT DISTINCT bzn FROM consumption_cleaned"
     countries = sorted([row[0] for row in conn.execute(countries_query).fetchall()])
 
-    date_query = """
-        SELECT MIN(datetime) AS min_date, MAX(datetime) AS max_date
+    # Query unique hourly datetimes
+    datetime_query = """
+        SELECT DISTINCT DATE_TRUNC('hour', datetime) AS hourly_datetime
         FROM consumption_cleaned
+        ORDER BY hourly_datetime
     """
-    min_date, max_date = conn.execute(date_query).fetchone()
-    
-    # Ensure that min_date and max_date are datetime objects
-    min_date = pd.to_datetime(min_date).to_pydatetime()  # Convert to native Python datetime
-    max_date = pd.to_datetime(max_date).to_pydatetime()  # Convert to native Python datetime
+    available_datetimes = conn.execute(datetime_query).fetchdf()["hourly_datetime"].to_list()
+
+    # Convert to Python datetime objects
+    available_datetimes = [
+        pd.Timestamp(ts).to_pydatetime() for ts in available_datetimes
+    ]
 except Exception as e:
-    st.error(f"Failed to fetch filters: {e}")
+    st.error(f"Failed to fetch available hourly datetimes: {e}")
     st.stop()
 
 # ---- Sidebar Filters ----
 st.sidebar.header("Filters")
 selected_country = st.sidebar.selectbox("Select a Country/Region", countries)
 
-date_range = st.sidebar.slider(
-    "Select Date Range",
-    min_value=min_date,
-    max_value=max_date,
-    value=(min_date, max_date),
-    format="YYYY-MM-DD HH:mm"
-)
+# Use select_slider for range selection with two endpoints
+if available_datetimes:
+    date_range = st.sidebar.select_slider(
+        "Select Date Range",
+        options=available_datetimes,
+        value=(min(available_datetimes), max(available_datetimes)),  # Default to the full range
+        format_func=lambda x: x.strftime("%Y-%m-%d %H:%M")  # Format display
+    )
+else:
+    st.error("No hourly data available.")
+    st.stop()
+
+# Access selected start and end times
+start_datetime, end_datetime = date_range
+
 
 # ---- User Selections ----
 st.sidebar.header("Plot Configuration")

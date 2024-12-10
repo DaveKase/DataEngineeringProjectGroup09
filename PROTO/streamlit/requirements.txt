@@ -2,3 +2,8 @@ streamlit
 duckdb
 watchdog
 matplotlib
+folium
+streamlit-folium
+geopandas
+pandas
+branca
