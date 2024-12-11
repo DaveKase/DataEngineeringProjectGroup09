@@ -43,10 +43,6 @@ RUN chown -R airflow:root /opt/airflow/log
 RUN chown -R airflow:root /opt/airflow/log/scheduler
 RUN chown -R airflow:root /opt/airflow/logs/scheduler
 
-RUN mkdir -p /opt/airflow/logs/scheduler/2024-12-10
-RUN chmod -R 777 /opt/airflow/logs/scheduler/2024-12-10
-RUN chown -R airflow:root /opt/airflow/logs/scheduler/2024-12-10
-
 # Add airflow user to root group
 RUN usermod -aG root airflow
 
