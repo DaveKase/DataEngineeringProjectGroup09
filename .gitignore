@@ -2,3 +2,8 @@
 *.parquet
 *.csv
 *.crc
+*.duckdb
+*.avro
+*.msgpack
+*.sql
+*.gpickle
