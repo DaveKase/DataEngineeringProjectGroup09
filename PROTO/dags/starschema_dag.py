@@ -174,6 +174,9 @@ def get_data():
 def divide_data_into_starschema(weather, consumption, price, production):
     print("dividing data...")    
     populate_units_table(consumption, price, production)
+    populate_weather_condition_table(weather, consumption, price, production)
+
+    print("Data division into tables was SUCCESSFULLLL!!!!")
 
 # Populates the units_dimen table with units across other tables
 def populate_units_table(consumption, price, production):
@@ -193,19 +196,19 @@ def populate_units_table(consumption, price, production):
         if record[2] not in units:
             units.append[record[2]]
 
-    for unit in units:
-        unit_class = ""
-        unit_long = ""
+    units.append("%")
+    units.append("degC")
+    units.append("mm")
+    units.append("cm")
+    units.append("km")
+    units.append("kph")
+    units.append("mb")
+    units.append("W/m^2")
+    units.append("J/m^2")
 
-        if unit == "MAW":
-            unit_class = "electricity"
-            unit_long = "MAW"
-        elif unit == "MWH":
-            unit_class = "electricity"
-            unit_long = "megawatt-hours"
-        elif unit == "EUR":
-            unit_class = "price"
-            unit_long = "Euro"
+    for unit in units:
+        unit_class = unit_mapper(unit)[0]
+        unit_long = unit_mapper(unit)[1]
 
         sql = f"""INSERT INTO unit_DIMEN (_id, unit_short, unit_long, unit_class) SELECT (SELECT COUNT(*) FROM unit_DIMEN) + 1, 
           \'{unit}\', \'{unit_long}\', \'{unit_class}\' WHERE NOT EXISTS (SELECT 1 FROM unit_DIMEN WHERE unit_short = \'{unit}\');"""
@@ -216,6 +219,63 @@ def populate_units_table(consumption, price, production):
         con.close()
     
     print("units_DIMEN table populated with data")
+
+def unit_mapper(unit):
+    unit_class = ""
+    unit_long = ""
+
+    if unit == "MAW":
+        unit_class = "electricity"
+        unit_long = "MAW"
+    elif unit == "MWH":
+        unit_class = "electricity"
+        unit_long = "megawatt-hours"
+    elif unit == "EUR":
+        unit_class = "price"
+        unit_long = "Euro"
+    elif unit == "%":
+        unit_class = "weather"
+        unit_long = "percentage"
+    elif unit == "degC":
+        unit_class = "weather"
+        unit_long = "degrees Celsius"
+    elif unit == "mm":
+        unit_class = "weather"
+        unit_long = "millimeters"
+    elif unit == "cm":
+        unit_class = "weather"
+        unit_long = "centimeters"
+    elif unit == "km":
+        unit_class = "weather"
+        unit_long = "kilometers"
+    elif unit == "kph":
+        unit_class = "weather"
+        unit_long = "kilometers per hour"
+    elif unit == "mb":
+        unit_class = "weather"
+        unit_long = "millibars"
+    elif unit == "W/m^2":
+        unit_class = "weather"
+        unit_long = "watts per square meter"
+    elif unit == "J/m^2":
+        unit_class = "weather"
+        unit_long = "jauls per square meter"
+    
+    return unit_class, unit_long
+
+def populate_weather_condition_table(weather, consumption, price, production):
+    weather_conditions = []
+    duckdb_file = '/mnt/tmp/duckdb_data/weather.duckdb'
+    con = duckdb.connect(duckdb_file)
+    table_headers = "SELECT column_name FROM information_schema.columns WHERE table_name = 'weather_data';"
+    header_names = con.sql(table_headers).fetchall()
+    con.close()
+
+    print(f"table headers: {header_names}")
+    
+
+    for record in weather:
+        print(f"record in weather: {record}")
 
 '''
 DAG definitions and running order
@@ -233,7 +293,7 @@ with DAG(
     catchup=False
 ) as dag:
     create_tables_task = PythonOperator(
-        task_id = 'create_tables',
+        task_id = 'create_tables_task',
         python_callable = create_tables
     )
 
