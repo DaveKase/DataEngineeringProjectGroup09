@@ -1,7 +1,5 @@
 '''
-This DAG should take data from 4 DuckDB databases and transform them into StarSchema and save it back to DuckDB
-
-At the moment, it's just testing if it shows up in the DAGs view and if it works at all
+This DAG should take data from 4 DuckDB tables and transform them into StarSchema and save it back to DuckDB
 '''
 
 from airflow import DAG
@@ -10,6 +8,7 @@ from datetime import datetime, timedelta  # Add timedelta import
 import duckdb
 import os
 
+# Basically router for create_tables_task. Now we have all table creations under one DAG, instead of 6 different DAGS.
 def create_tables():
     print("creating tables")
     create_measurements_fact_table()
@@ -20,6 +19,7 @@ def create_tables():
     create_timestamp_dimen_table()
     print("Tables created successfully")
 
+# Takes the table name and the sql query as inputs and creates table in DuckDB
 def table_creation_script(table_name, sql):
     print(f"Creating table {table_name}")
     duckdb_file = '/mnt/tmp/duckdb_data/' + table_name + '.duckdb'
@@ -173,11 +173,10 @@ def get_data():
 # Takes the queried data and divides it into 6 tables
 def divide_data_into_starschema(weather, consumption, price, production):
     print("dividing data...")    
-    populate_units_table(weather, consumption, price, production)
+    populate_units_table(consumption, price, production)
 
 # Populates the units_dimen table with units across other tables
-def populate_units_table(weather, consumption, price, production):
-    print(price)
+def populate_units_table(consumption, price, production):
     units = []
 
     for record in consumption:
@@ -193,8 +192,6 @@ def populate_units_table(weather, consumption, price, production):
     for record in production:
         if record[2] not in units:
             units.append[record[2]]
-
-    print(f"units list is: {units}")
 
     for unit in units:
         unit_class = ""
@@ -212,13 +209,13 @@ def populate_units_table(weather, consumption, price, production):
 
         sql = f"""INSERT INTO unit_DIMEN (_id, unit_short, unit_long, unit_class) SELECT (SELECT COUNT(*) FROM unit_DIMEN) + 1, 
           \'{unit}\', \'{unit_long}\', \'{unit_class}\' WHERE NOT EXISTS (SELECT 1 FROM unit_DIMEN WHERE unit_short = \'{unit}\');"""
-        
-        print(f"sql statement: {sql}")
 
         duckdb_file = '/mnt/tmp/duckdb_data/unit_DIMEN.duckdb'
         con = duckdb.connect(duckdb_file)
         con.execute(sql)
         con.close()
+    
+    print("units_DIMEN table populated with data")
 
 '''
 DAG definitions and running order
