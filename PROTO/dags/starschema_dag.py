@@ -10,6 +10,16 @@ from datetime import datetime, timedelta  # Add timedelta import
 import duckdb
 import os
 
+def create_tables():
+    print("creating tables")
+    create_measurements_fact_table()
+    create_bz_dimen_table()
+    create_energy_type_dimen_table()
+    create_weather_condition_dimen_table()
+    create_unit_dimen_table()
+    create_timestamp_dimen_table()
+    print("Tables created successfully")
+
 def table_creation_script(table_name, sql):
     print(f"Creating table {table_name}")
     duckdb_file = '/mnt/tmp/duckdb_data/' + table_name + '.duckdb'
@@ -129,65 +139,90 @@ def create_timestamp_dimen_table():
 Data selection and preparation
 '''
 
-# Querying data from cleaned tables
+# Querying data from tables
 def get_data():
   print("querying data")
-  duckdb_file = '/mnt/tmp/duckdb_data/combined_data.duckdb'
+
+  duckdb_file = '/mnt/tmp/duckdb_data/weather.duckdb'
   con = duckdb.connect(duckdb_file)
-
-  sql = "select * from weather_cleaned;"
-  weather_cleaned = con.sql(sql).fetchall()
-
-  sql = "select * from consumption_cleaned;"
-  consumption_cleaned = con.sql(sql).fetchall()
-  
-  sql = "select * from price_cleaned;"
-  price_cleaned = con.sql(sql).fetchall()
-
-  sql = "select * from production_cleaned;"
-  production_cleaned = con.sql(sql).fetchall()
-
+  sql = "select * from weather_data;"
+  weather = con.sql(sql).fetchall()
   con.close()
+
+  duckdb_file = '/mnt/tmp/duckdb_data/consumption.duckdb'
+  con = duckdb.connect(duckdb_file)
+  sql = "select * from consumption_data;"
+  consumption = con.sql(sql).fetchall()
+  con.close()
+  
+  duckdb_file = '/mnt/tmp/duckdb_data/price.duckdb'
+  con = duckdb.connect(duckdb_file)
+  sql = "select * from price_data;"
+  price = con.sql(sql).fetchall()
+  con.close()
+
+  duckdb_file = '/mnt/tmp/duckdb_data/production.duckdb'
+  con = duckdb.connect(duckdb_file)
+  sql = "select * from production_data;"
+  production = con.sql(sql).fetchall()
+  con.close()
+
   print("data query success!!")
-  divide_data_into_starschema(weather_cleaned, consumption_cleaned, price_cleaned, production_cleaned)
+  divide_data_into_starschema(weather, consumption, price, production)
 
-def divide_data_into_starschema(weather_cleaned, consumption_cleaned, price_cleaned, production_cleaned):
-    print("dividing data...")
-    #print(consumption_cleaned)
-    #print(f"type of cons_clnd = {type(consumption_cleaned)}")
-    
-    populate_units_table(weather_cleaned, consumption_cleaned, price_cleaned, production_cleaned)
+# Takes the queried data and divides it into 6 tables
+def divide_data_into_starschema(weather, consumption, price, production):
+    print("dividing data...")    
+    populate_units_table(weather, consumption, price, production)
 
-def populate_units_table(weather_cleaned, consumption_cleaned, price_cleaned, production_cleaned):
-    print(price_cleaned)
-    #print(f"type of cons_clnd = {type(consumption_cleaned)}")
+# Populates the units_dimen table with units across other tables
+def populate_units_table(weather, consumption, price, production):
+    print(price)
+    units = []
 
-    units = {}
-
-    for record in consumption_cleaned:
+    for record in consumption:
         if record[2] not in units:
-            units.append("price": record[2])
+            units.append(record[2])
     
-    for record in price_cleaned:
+    for record in price:
         if record[2] not in units:
             units.append(record[2])
         if record[3] not in units:
             units.append(record[3])
     
-    for record in production_cleaned:
+    for record in production:
         if record[2] not in units:
             units.append[record[2]]
-    
-    # I guess there are no units in weather table
-    #for record in weather_cleaned:
-        #print(f"we have data: {record}")
 
     print(f"units list is: {units}")
 
     for unit in units:
-        sql = "insert into unit_DIMEN (unit_short, unit_long, unit_class) values ()"
+        unit_class = ""
+        unit_long = ""
 
+        if unit == "MAW":
+            unit_class = "electricity"
+            unit_long = "MAW"
+        elif unit == "MWH":
+            unit_class = "electricity"
+            unit_long = "megawatt-hours"
+        elif unit == "EUR":
+            unit_class = "price"
+            unit_long = "Euro"
 
+        sql = f"""INSERT INTO unit_DIMEN (_id, unit_short, unit_long, unit_class) SELECT (SELECT COUNT(*) FROM unit_DIMEN) + 1, 
+          \'{unit}\', \'{unit_long}\', \'{unit_class}\' WHERE NOT EXISTS (SELECT 1 FROM unit_DIMEN WHERE unit_short = \'{unit}\');"""
+        
+        print(f"sql statement: {sql}")
+
+        duckdb_file = '/mnt/tmp/duckdb_data/unit_DIMEN.duckdb'
+        con = duckdb.connect(duckdb_file)
+        con.execute(sql)
+        con.close()
+
+'''
+DAG definitions and running order
+'''
 # Define the DAG
 with DAG(
     dag_id="starschema_transform",  # Name of the DAG
@@ -200,34 +235,9 @@ with DAG(
     schedule_interval='@daily',  # This will run the DAG once a day
     catchup=False
 ) as dag:
-    create_measurements_table_task = PythonOperator(
-        task_id = 'create_measurement_fact_table',
-        python_callable = create_measurements_fact_table
-    )
-
-    create_bz_dimen_table_task = PythonOperator(
-        task_id = 'create_bidding_zone_dimension_table',
-        python_callable = create_bz_dimen_table
-    )
-
-    create_energy_type_table_task = PythonOperator(
-        task_id = 'create_energy_type_dimension_table',
-        python_callable = create_energy_type_dimen_table
-    )
-
-    create_weather_condition_table_task = PythonOperator(
-        task_id = 'create_weather_condition_dimension_table',
-        python_callable = create_weather_condition_dimen_table
-    )
-
-    create_unit_table_task = PythonOperator(
-        task_id = 'create_unit_dimension_table',
-        python_callable = create_unit_dimen_table
-    )
-
-    create_timestamp_table_task = PythonOperator(
-        task_id = 'create_timestamp_dimension_table',
-        python_callable = create_timestamp_dimen_table
+    create_tables_task = PythonOperator(
+        task_id = 'create_tables',
+        python_callable = create_tables
     )
 
     query_data_task = PythonOperator(
@@ -236,10 +246,4 @@ with DAG(
     )
 
     # Define task dependencies (order of execution)
-    create_measurements_table_task
-    create_bz_dimen_table_task
-    create_energy_type_table_task
-    create_weather_condition_table_task
-    create_unit_table_task
-    create_timestamp_table_task
-    query_data_task
+    create_tables_task >>  query_data_task
