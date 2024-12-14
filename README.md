@@ -11,6 +11,9 @@ As nations work towards ambitious climate goals, gaining a deeper understanding 
 This project provides actionable insights through real-time visualizations and reports, exploring the interplay between renewable energy production and energy consumption in Northern Europe, 
 while also examining the influence of weather patterns. Using open-source APIs from ENTSO-E and VisualCrossing, this project leverages cutting-edge tools to deliver valuable data-driven perspectives.
 
+![Example Image](images/pipeline_schema.png)
+
+
 The energy markets and weather conditions are monitored through an automated data pipeline built using a Dockerized environment and orchestrated with Apache Airflow. 
 Raw data is ingested into an Apache Iceberg data lakehouse, queried, and processed using dbt (data build tool) to meet specific analytical requirements. 
 Further transformations, including the creation of star schemas within DuckDB, are managed by Airflow DAGs. 
