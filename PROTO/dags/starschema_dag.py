@@ -12,8 +12,6 @@ DUCKDB_FILENAME = '/mnt/tmp/duckdb_data/star_schema_db.duckdb'
 
 # Basically router for create_tables_task. Now we have all table creations under one DAG, instead of 6 different DAGS.
 def create_tables():
-    duckdb_file = '/mnt/tmp/duckdb_data/star_schema_db.duckdb'
-
     if not os.path.exists(DUCKDB_FILENAME):
         print(f"Creating DuckDB file at: {DUCKDB_FILENAME}")  # Debug statement
     
@@ -42,7 +40,6 @@ def table_creation_script(table_name, sql, con):
 '''
 Creating FACT table
 '''
-
 # Creating the fact table (measurements)
 def create_measurements_fact_table(con):
     table_name = "measurements_FACT"
@@ -67,7 +64,6 @@ def create_measurements_fact_table(con):
 '''
 Creating the dimension tables (all 5 of them)
 '''
-
 # Creating bidding zone dimension table
 def create_bz_dimen_table(con):
     table_name = "bidding_zone_DIMEN"
@@ -142,7 +138,6 @@ def create_timestamp_dimen_table(con):
 '''
 Data selection and preparation
 '''
-
 # Querying data from tables
 def get_data():
   print("querying data")
@@ -180,7 +175,7 @@ def divide_data_into_starschema(weather, consumption, price, production):
     con = duckdb.connect(DUCKDB_FILENAME)
 
     populate_units_table(consumption, price, production, con)
-    #populate_weather_condition_table(weather, consumption, price, production)
+    populate_weather_condition_table(weather, consumption, price, production, con)
     
     con.close()
     print("Data division into tables was SUCCESSFULLLL!!!!")
@@ -204,13 +199,14 @@ def populate_units_table(consumption, price, production, con):
             units.append[record[2]]
 
     units.append("%")
-    units.append("degC")
+    units.append("°C")
     units.append("mm")
     units.append("cm")
     units.append("km")
     units.append("kph")
     units.append("m/s")
     units.append("mb")
+    units.append("mmHg")
     units.append("W/m²")
     units.append("J/m²")
 
@@ -233,7 +229,7 @@ def unit_mapper(unit):
 
     if unit == "MAW":
         unit_class = "electricity"
-        unit_long = "MAW"
+        unit_long = "Mega Active Wat"
     elif unit == "MWH":
         unit_class = "electricity"
         unit_long = "megawatt-hours"
@@ -243,7 +239,7 @@ def unit_mapper(unit):
     elif unit == "%":
         unit_class = "weather"
         unit_long = "percentage"
-    elif unit == "degC":
+    elif unit == "°C":
         unit_class = "weather"
         unit_long = "degrees Celsius"
     elif unit == "mm":
@@ -264,6 +260,9 @@ def unit_mapper(unit):
     elif unit == "mb":
         unit_class = "weather"
         unit_long = "millibars"
+    elif unit == "mmHg":
+        unit_class = "weather"
+        unit_long = "air pressure"
     elif unit == "W/m²":
         unit_class = "weather"
         unit_long = "watts per square meter"
@@ -274,19 +273,267 @@ def unit_mapper(unit):
     return unit_class, unit_long
 
 # This populates weather condition dimension table.
-def populate_weather_condition_table(weather, consumption, price, production):
+def populate_weather_condition_table(weather, consumption, price, production, con):
     weather_conditions = []
     duckdb_file = '/mnt/tmp/duckdb_data/weather.duckdb'
-    con = duckdb.connect(duckdb_file)
+    table_header_con = duckdb.connect(duckdb_file)
     table_headers = "SELECT column_name FROM information_schema.columns WHERE table_name = 'weather_data';"
-    header_names = con.sql(table_headers).fetchall()
-    con.close()
+    header_names = table_header_con.sql(table_headers).fetchall()
+    table_header_con.close()
 
-    print(f"table headers: {header_names}")
-    
+    # Extract column names from tuples
+    header_names = [name[0] for name in header_names]
+    weather_dict = []
 
+    # Loop through weather data
     for record in weather:
-        print(f"record in weather: {record}")
+        record_dict = {}
+        for i, value in enumerate(record):
+            record_dict[header_names[i]] = value
+        
+        weather_dict.append(record_dict)
+
+    for record in weather_dict:
+        conditions = record['conditions']
+        if record['weathertype'] != '':
+            conditions += ", " + record['weathertype']
+
+         # Split conditions into separate values
+        condition_list = [condition.strip() for condition in conditions.split(',')]
+
+        for condition in condition_list:
+           if condition not in weather_conditions:
+                weather_conditions.append(condition)
+    
+    for header in header_names:
+        if header != "datetimeStr" and header != "datetime" and header != "stationinfo" and header != "weathertype" and header != "conditions" and header != "Country" and header != "EIC" and header != "BZN" and header != "stationContributions":
+             if header not in weather_conditions:
+                weather_conditions.append(header)
+
+    for condition in weather_conditions:
+        sql = f"""INSERT INTO weather_condition_DIMEN (_id, condition_short, condition_long, condition_type, numerical) SELECT (SELECT COUNT(*) FROM weather_condition_DIMEN) + 1, 
+          \'{condition_mapper(condition)[0]}\', \'{condition_mapper(condition)[1]}\', \'{condition_mapper(condition)[2]}\', {condition_mapper(condition)[3]} 
+          WHERE NOT EXISTS (SELECT 1 FROM weather_condition_DIMEN WHERE condition_short = \'{condition_mapper(condition)[0]}\');"""
+
+        con.execute(sql)
+    
+    print("weather_condition_DIMEN table populated with data")
+
+# Taking condition name and adding missing fields that are neccessary for the weather_condition dimension table
+def condition_mapper(condition):
+    condition_short = ""
+    condition_long = ""
+    condition_type = ""
+    numerical = 0
+
+    if condition == "Partially cloudy":
+        condition_short = "pcloudy"
+        condition_long = condition
+        condition_type = "clouds"
+        numerical = 0
+    if condition == "Overcast":
+        condition_short = "ovrcst"
+        condition_long = condition
+        condition_type = "clouds"
+        numerical = 0
+    if condition == "Light Snow":
+        condition_short = "lghtsnow"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Rain":
+        condition_short = "rain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+        numerical = 0
+    if condition == "Snow":
+        condition_short = "snow"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Snow Showers":
+        condition_short = "snowshwrs"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Mist":
+        condition_short = condition
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Light Rain And Snow":
+        condition_short = "lghtrainandsnow"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Light Rain":
+        condition_short = "lghtrain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Freezing Drizzle/Freezing Rain":
+        condition_short = "frdrizrain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Sky Coverage Increasing":
+        condition_short = "skycovinc"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Light Freezing Rain":
+        condition_short = "lghtfrizrain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Drizzle":
+        condition_short = "drzl"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Fog":
+        condition_short = "fog"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Light Drizzle":
+        condition_short = "lghtdrzl"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Clear":
+        condition_short = "clr"
+        condition_long = condition
+        condition_type = "clouds"
+        numerical = 0
+    if condition == "Heavy Rain And Snow":
+        condition_short = "clr"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Rain Showers":
+        condition_short = "rainshwrs"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Dust storm":
+        condition_short = "dststrm"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Light Freezing Drizzle/Freezing Rain":
+        condition_short = "lghtfrizdrzlandfrizrain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Precipitation In Vicinity":
+        condition_short = "prcptinvcn"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Snow And Rain Showers":
+        condition_short = "snwnrainshwrs"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Ice":
+        condition_short = "ice"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Light Drizzle/Rain":
+        condition_short = "lghtdrizlnrain"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Sky Coverage Decreasing":
+        condition_short = "skycovdec"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "wdir":
+        condition_short = condition
+        condition_long = "wind direction"
+        condition_type = "wind"
+        numerical = 1
+    if condition == "cloudcover":
+        condition_short = "cloudcvr"
+        condition_long = "cloud cover"
+        condition_type = "clouds"
+        numerical = 1
+    if condition == "mint":
+        condition_short = condition
+        condition_long = "minimum temperature"
+        condition_type = "air"
+        numerical = 1
+    if condition == "precip":
+        condition_short = condition
+        condition_long = "precipitation"
+        condition_type = "precipitation"
+        numerical = 1
+    if condition == "solarradiation":
+        condition_short = "soalrrad"
+        condition_long = "solar radiation"
+        condition_type = "solar"
+        numerical = 1
+    if condition == "dew":
+        condition_short = condition
+        condition_long = "dew point"
+        condition_type = "air"
+        numerical = 1
+    if condition == "humidity":
+        condition_short = "hmdty"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 1
+    if condition == "temp":
+        condition_short = "temperature"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 1
+    if condition == "maxt":
+        condition_short = condition
+        condition_long = "maximum temperature"
+        condition_type = "air"
+        numerical = 1
+    if condition == "visibility":
+        condition_short = condition
+        condition_long = condition
+        condition_type = "air"
+        numerical = 1
+    if condition == "wspd":
+        condition_short = condition
+        condition_long = "wind speed"
+        condition_type = "air"
+        numerical = 1
+    if condition == "solarenergy":
+        condition_short = "solaren"
+        condition_long = "solar energy"
+        condition_type = "air"
+        numerical = 1
+    if condition == "sealevelpressure":
+        condition_short = "slevprs"
+        condition_long = "sealevel pressure"
+        condition_type = "air"
+        numerical = 1
+    if condition == "windchill":
+        condition_short = "wndchl"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 1
+    if condition == "wgust":
+        condition_short = condition
+        condition_long = "wind gust"
+        condition_type = "air"
+        numerical = 1
+    if condition == "snowdepth":
+        condition_short = condition
+        condition_long = "snow depth"
+        condition_type = "precipitation"
+        numerical = 1
+
+    return condition_short, condition_long, condition_type, numerical
 
 '''
 DAG definitions and running order
