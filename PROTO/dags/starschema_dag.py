@@ -177,6 +177,7 @@ def divide_data_into_starschema(weather, consumption, price, production):
     populate_units_table(consumption, price, production, con)
     populate_weather_condition_table(weather, con)
     populate_energy_type_table(production, con)
+    populate_bidding_zone_table(con)
     
     con.close()
     print("Data division into tables was SUCCESSFULLLL!!!!")
@@ -325,6 +326,132 @@ def condition_mapper(condition):
     condition_type = ""
     numerical = 0
 
+    if condition == "Partially cloudy":
+        condition_short = "pcloudy"
+        condition_long = condition
+        condition_type = "clouds"
+        numerical = 0
+    if condition == "Overcast":
+        condition_short = "ovrcst"
+        condition_long = condition
+        condition_type = "clouds"
+        numerical = 0
+    if condition == "Light Snow":
+        condition_short = "lghtsnow"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Rain":
+        condition_short = "rain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+        numerical = 0
+    if condition == "Snow":
+        condition_short = "snow"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Snow Showers":
+        condition_short = "snowshwrs"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Mist":
+        condition_short = condition
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Light Rain And Snow":
+        condition_short = "lghtrainandsnow"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Light Rain":
+        condition_short = "lghtrain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Freezing Drizzle/Freezing Rain":
+        condition_short = "frdrizrain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Sky Coverage Increasing":
+        condition_short = "skycovinc"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Light Freezing Rain":
+        condition_short = "lghtfrizrain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Drizzle":
+        condition_short = "drzl"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Fog":
+        condition_short = "fog"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Light Drizzle":
+        condition_short = "lghtdrzl"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Clear":
+        condition_short = "clr"
+        condition_long = condition
+        condition_type = "clouds"
+        numerical = 0
+    if condition == "Heavy Rain And Snow":
+        condition_short = "clr"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Rain Showers":
+        condition_short = "rainshwrs"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Dust storm":
+        condition_short = "dststrm"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Light Freezing Drizzle/Freezing Rain":
+        condition_short = "lghtfrizdrzlandfrizrain"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Precipitation In Vicinity":
+        condition_short = "prcptinvcn"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Snow And Rain Showers":
+        condition_short = "snwnrainshwrs"
+        condition_long = condition
+        condition_type = "precipitation"
+        numerical = 0
+    if condition == "Ice":
+        condition_short = "ice"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Light Drizzle/Rain":
+        condition_short = "lghtdrizlnrain"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
+    if condition == "Sky Coverage Decreasing":
+        condition_short = "skycovdec"
+        condition_long = condition
+        condition_type = "air"
+        numerical = 0
     if condition == "wind_direction":
         condition_short = "wdir"
         condition_long = "wind direction"
@@ -408,6 +535,7 @@ def condition_mapper(condition):
 
     return condition_short, condition_long, condition_type, numerical
 
+# Populating energy type table with data from production table
 def populate_energy_type_table(production, con):
     energy_types = []
 
@@ -424,6 +552,7 @@ def populate_energy_type_table(production, con):
     
     print("energy_type_DIMEN table populated with data")
 
+# Mapping missing values to energy type
 def energy_type_mapper(energy_type):
     energy_type_class = ""
     renewable = 0
@@ -511,6 +640,32 @@ def energy_type_mapper(energy_type):
         carbon = 0
     
     return energy_type_class, renewable, carbon
+
+# Populating bidding zone table with required data
+def populate_bidding_zone_table(con):
+    bzn_to_country = {
+        "EE": "Estonia", "LV": "Latvia", "LT": "Lithuania", "FI": "Finland",
+        "SE1": "Sweden", "SE2": "Sweden", "SE3": "Sweden", "SE4": "Sweden", 
+        "NO1": "Norway", "NO2": "Norway", "NO3": "Norway", "NO4": "Norway", "NO5": "Norway",
+        "DK1": "Denmark", "DK2": "Denmark", "DE-LU": "Germany", "PL": "Poland"
+    }
+
+    for bzn in bzn_to_country:
+        country = bzn_to_country[bzn]
+        print(country)
+        resolution = 60
+
+        if country == "Poland" or country == "Lithuania" or country == "Germany" or country == "Finland":
+            resolution = 15
+
+        sql = f"""
+            INSERT INTO bidding_zone_DIMEN (_id, bzn, country, eu_member, data_resolution, geometry) SELECT (SELECT COUNT(*) FROM bidding_zone_DIMEN) + 1, '{bzn}', '{country}', 1, {resolution}, 'geom' 
+            WHERE NOT EXISTS (SELECT 1 FROM bidding_zone_DIMEN WHERE bzn = '{bzn}');
+        """
+        
+        con.execute(sql)
+
+    print("energy_type_DIMEN table populated with data")
 
 '''
 DAG definitions and running order
