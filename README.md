@@ -27,7 +27,7 @@ These transformations prepare the necessary tables for an interactive Streamlit 
 3. Populate API keys for ENTSO-E and VisualCrossing into .env file based on env-sample found in PROTO directory.
 
 4. In the /PROTO/config_files/config_dates.json file, set the time period for data ingestion.
-    (For testing, a maximum of 48h duration highly recommended.)
+    (For testing, a maximum of 48h duration is enforced on free plan.)
 
 5. Modify the /PROTO/config_files/country_code_mapper.csv to select the countries or electricity bidding zones you wish to analyze. We recommend not changing the current settings, since the pipeline does not allow for dynamic changes at the moment. By default all the energy market regions around the Baltic Sea are selected.
 

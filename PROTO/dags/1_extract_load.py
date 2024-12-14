@@ -8,35 +8,29 @@ from datetime import datetime, timedelta
 import os
 import json
 import pyarrow as pa
-import pyarrow.parquet as pq
 from pyiceberg.catalog import load_catalog
 from pyiceberg.schema import Schema, NestedField
-from pyiceberg.types import StringType, LongType, FloatType, TimestampType, DoubleType
+from pyiceberg.types import StringType, LongType, TimestampType, DoubleType
 import duckdb
-
-df = pd.DataFrame()
 
 _ENSTOE_API_KEY = os.getenv('_ENTSOE_SECURITY_TOKEN')
 _WEATHER_API_KEY = os.getenv('_WEATHER_API_KEY')
 
 
-
 def fetch_and_process_production(**context):
-    # Load environment variables from .env file
     url = "https://web-api.tp.entsoe.eu/api"
 
     # Get bidding zones EIC code from file
     df_csv = pd.read_csv('/opt/airflow/config_files/country_code_mapper.csv')
     bidding_zones = df_csv['EIC'].dropna().str.strip().tolist()
     
-    # Parse dates from the JSON file
+    # Parse dates from the JSON config file
     with open('/opt/airflow/config_files/config_dates.json', 'r') as f:
         config = json.load(f)
     start_date = datetime.strptime(config["start_date"], "%Y-%m-%d")
-    end_date = datetime.strptime(config["end_date"], "%Y-%m-%d") + timedelta(days=1)  # Include the entire day
+    end_date = datetime.strptime(config["end_date"], "%Y-%m-%d") + timedelta(days=1)
     period_duration = timedelta(days=31)  # Example: one-month intervals
     
-    print(start_date, end_date)
     
     time_periods = []
     current_start = start_date
@@ -54,9 +48,7 @@ def fetch_and_process_production(**context):
 
     # Loop through each bidding zone and time period
     for bidding_zone in bidding_zones:
-        #print(bidding_zone)
         for period_start, period_end in time_periods:
-            #print(period_start)
             params = {
                 "securityToken": _ENSTOE_API_KEY,
                 "documentType": "A75",
@@ -113,7 +105,7 @@ def fetch_and_process_production(**context):
     # Create DataFrame with all data
     df = pd.DataFrame(data)
     
-    # Define the dictionary
+    # Define energy type dictionary
     energy_type_dict = {
         "B01": "Biomass",
         "B02": "Fossil Brown coal/Lignite",
@@ -150,15 +142,11 @@ def fetch_and_process_production(**context):
     # Apply the function to create the duration_from_start column
     df['duration_from_start'] = df.apply(calculate_duration, axis=1)
     df['produced_energy_type'] = df['produced_energy_type_code'].map(energy_type_dict)
-
     # Calculate the datetime for each price point by adding the duration to start_time
     df['datetime'] = df['start_time'] + df['duration_from_start']
-
     # Drop unnecessary columns
     df = df.drop(columns=['resolution', 'position', 'start_time', 'end_time', 'duration_from_start', 'produced_energy_type_code'])
-    
     df.to_csv('/mnt/tmp/csv_data/production.csv')
-    
     return df
 
 
@@ -211,23 +199,19 @@ def save_production_to_iceberg(**context):
 
 
 def fetch_and_process_price(**context):
-    # Load environment variables from .env file
     url = "https://web-api.tp.entsoe.eu/api"
 
     # Get bidding zones EIC code from file
     df_csv = pd.read_csv('/opt/airflow/config_files/country_code_mapper.csv')
     bidding_zones = df_csv['EIC'].dropna().str.strip().tolist()
 
-
     # Parse dates from the JSON file
     with open('/opt/airflow/config_files/config_dates.json', 'r') as f:
         config = json.load(f)
     start_date = datetime.strptime(config["start_date"], "%Y-%m-%d")
-    end_date = datetime.strptime(config["end_date"], "%Y-%m-%d") + timedelta(days=1)  # Include the entire day
+    end_date = datetime.strptime(config["end_date"], "%Y-%m-%d") + timedelta(days=1) 
     period_duration = timedelta(days=31)  # Example: one-month intervals
     
-    print(start_date, end_date)
-
     time_periods = []
     current_start = start_date
     while current_start < end_date:
@@ -373,11 +357,9 @@ def fetch_and_process_consumption(**context):
     with open('/opt/airflow/config_files/config_dates.json', 'r') as f:
         config = json.load(f)
     start_date = datetime.strptime(config["start_date"], "%Y-%m-%d")
-    end_date = datetime.strptime(config["end_date"], "%Y-%m-%d") + timedelta(days=1)  # Include the entire day
+    end_date = datetime.strptime(config["end_date"], "%Y-%m-%d") + timedelta(days=1)
     period_duration = timedelta(days=31)  # Example: one-month intervals
     
-    print(start_date, end_date)
-
     time_periods = []
     current_start = start_date
     while current_start < end_date:
@@ -453,9 +435,7 @@ def fetch_and_process_consumption(**context):
     df['datetime'] = df['start_time'] + df['duration_from_start']
     # Drop unnecessary columns
     df = df.drop(columns=['resolution', 'position', 'start_time', 'end_time', 'duration_from_start'])
-    
     df.to_csv('/mnt/tmp/csv_data/consumption.csv')
-    
     return df
 
 
@@ -586,12 +566,11 @@ def arrow_to_iceberg_schema(pa_schema):
             continue
     return Schema(*iceberg_fields)
 
-# Function to process JSON files and save data to Iceberg
+
 def process_and_save_weather_to_iceberg(**context):
     """
     Process JSON files and save data to Iceberg as a single table.
     """
-    BASE_URL = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/weatherdata/history'
 
     # Load config dates
     CONFIG_FILE = '/opt/airflow/config_files/config_dates.json'
@@ -602,10 +581,6 @@ def process_and_save_weather_to_iceberg(**context):
     config_start_date = datetime.strptime(config_dates["start_date"], '%Y-%m-%d')
     config_end_date = datetime.strptime(config_dates["end_date"], '%Y-%m-%d')
 
-    # Adjust the date range to be a maximum of 48 hours, remove this if you have paid API connection
-    if (config_end_date - config_start_date).total_seconds() > 48 * 3600:
-        print("Weather data of max 48 hours can be queried. Adjusting start date accordingly.")
-        config_start_date = config_end_date - timedelta(hours=48)
 
     # Load country codes and coordinates from CSV
     COUNTRY_CODES_FILE = '/opt/airflow/config_files/country_code_mapper.csv'
@@ -653,7 +628,6 @@ def process_and_save_weather_to_iceberg(**context):
         station_contributions_str = json.dumps(station_contributions)
         df["stationContributions"] = station_contributions_str
         
-        #print(df.columns)
 
         # Use 'datetimeStr' directly for date-time field
         df["datetime"] = pd.to_datetime(df["datetime"], unit='ms')  # ISO 8601 format
@@ -692,7 +666,6 @@ def process_and_save_weather_to_iceberg(**context):
 
 
 def load_production_to_duckdb(**kwargs):
-    print("Processing the latest Parquet file.")  # Debug statement
 
     # Paths and connection details
     DUCKDB_FILE = '/mnt/tmp/duckdb_data/production.duckdb'
@@ -709,18 +682,16 @@ def load_production_to_duckdb(**kwargs):
             if file.endswith('.parquet'):
                 all_parquet_files.append(os.path.join(root, file))
 
-    print(f"Found Parquet files: {all_parquet_files}")  # Debug statement
     if not all_parquet_files:
         raise FileNotFoundError(f"No Parquet files found in the directory: {PARQUET_BASE_DIR}")
 
     # Find the latest Parquet file based on modification time
     latest_file = max(all_parquet_files, key=os.path.getmtime)
-    print(f"Loading data from the latest file: {latest_file}")  # Debug statement
 
     # Create DuckDB connection, create the file if it doesn't exist
     if not os.path.exists(DUCKDB_FILE):
         print(f"Creating DuckDB file at: {DUCKDB_FILE}")  # Debug statement
-    con = duckdb.connect(DUCKDB_FILE)
+    con = duckdb.connect(DUCKDB_FILE) #DuckDB automatically creates a new database file if it doesn't exist when you call connect
 
     # Ensure the table exists
     table_name = "production_data"
@@ -744,7 +715,6 @@ def load_production_to_duckdb(**kwargs):
 
 
 def load_price_to_duckdb(**kwargs):
-    print("Processing the latest Parquet file.")  # Debug statement
 
     # Paths and connection details
     DUCKDB_FILE = '/mnt/tmp/duckdb_data/price.duckdb'
@@ -761,18 +731,16 @@ def load_price_to_duckdb(**kwargs):
             if file.endswith('.parquet'):
                 all_parquet_files.append(os.path.join(root, file))
 
-    print(f"Found Parquet files: {all_parquet_files}")  # Debug statement
     if not all_parquet_files:
         raise FileNotFoundError(f"No Parquet files found in the directory: {PARQUET_BASE_DIR}")
 
     # Find the latest Parquet file based on modification time
     latest_file = max(all_parquet_files, key=os.path.getmtime)
-    print(f"Loading data from the latest file: {latest_file}")  # Debug statement
 
     # Create DuckDB connection, create the file if it doesn't exist
     if not os.path.exists(DUCKDB_FILE):
         print(f"Creating DuckDB file at: {DUCKDB_FILE}")  # Debug statement
-    con = duckdb.connect(DUCKDB_FILE)
+    con = duckdb.connect(DUCKDB_FILE) #DuckDB automatically creates a new database file if it doesn't exist when you call connect
 
     # Ensure the table exists
     table_name = "price_data"
@@ -795,7 +763,6 @@ def load_price_to_duckdb(**kwargs):
 
 
 def load_consumption_to_duckdb(**kwargs):
-    print("Processing the latest Parquet file.")  # Debug statement
 
     # Paths and connection details
     DUCKDB_FILE = '/mnt/tmp/duckdb_data/consumption.duckdb'
@@ -813,18 +780,16 @@ def load_consumption_to_duckdb(**kwargs):
             if file.endswith('.parquet'):
                 all_parquet_files.append(os.path.join(root, file))
 
-    print(f"Found Parquet files: {all_parquet_files}")  # Debug statement
     if not all_parquet_files:
         raise FileNotFoundError(f"No Parquet files found in the directory: {PARQUET_BASE_DIR}")
 
     # Find the latest Parquet file based on modification time
     latest_file = max(all_parquet_files, key=os.path.getmtime)
-    print(f"Loading data from the latest file: {latest_file}")  # Debug statement
 
     # Create DuckDB connection, create the file if it doesn't exist
     if not os.path.exists(DUCKDB_FILE):
         print(f"Creating DuckDB file at: {DUCKDB_FILE}")  # Debug statement
-    con = duckdb.connect(DUCKDB_FILE)
+    con = duckdb.connect(DUCKDB_FILE) #DuckDB automatically creates a new database file if it doesn't exist when you call connect
 
     # Ensure the table exists
     table_name = "consumption_data"
@@ -847,7 +812,6 @@ def load_consumption_to_duckdb(**kwargs):
 
 
 def load_weather_to_duckdb(**kwargs):
-    print("Processing the latest Parquet file.")  # Debug statement
 
     # Paths and connection details
     DUCKDB_FILE = '/mnt/tmp/duckdb_data/weather.duckdb'
@@ -864,18 +828,16 @@ def load_weather_to_duckdb(**kwargs):
             if file.endswith('.parquet'):
                 all_parquet_files.append(os.path.join(root, file))
 
-    print(f"Found Parquet files: {all_parquet_files}")  # Debug statement
     if not all_parquet_files:
         raise FileNotFoundError(f"No Parquet files found in the directory: {PARQUET_BASE_DIR}")
 
     # Find the latest Parquet file based on modification time
     latest_file = max(all_parquet_files, key=os.path.getmtime)
-    print(f"Loading data from the latest file: {latest_file}")  # Debug statement
 
     # Create DuckDB connection, create the file if it doesn't exist
     if not os.path.exists(DUCKDB_FILE):
         print(f"Creating DuckDB file at: {DUCKDB_FILE}")  # Debug statement
-    con = duckdb.connect(DUCKDB_FILE)
+    con = duckdb.connect(DUCKDB_FILE) #DuckDB automatically creates a new database file if it doesn't exist when you call connect
 
     # Ensure the table exists
     table_name = "weather_data"
@@ -963,7 +925,6 @@ with DAG(
         bash_command="docker exec -i dbt dbt run --models weather_cleaned",  # Run the DBT command inside the dbt container
         dag=dag,
     )
-    
 
     fetch_and_process_production >> save_production_to_iceberg >> load_production_to_duckdb
     fetch_and_process_price >> save_price_to_iceberg >> load_price_to_duckdb
