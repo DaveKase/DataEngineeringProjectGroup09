@@ -3,10 +3,8 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
+- [Installation and Usage](#installation_and_usage)
+- [ALIs](#APIs)
 
 ## Overview
 As nations work towards ambitious climate goals, gaining a deeper understanding of renewable energy dynamics, weather patterns, and their economic implications is more important than ever. 
@@ -24,14 +22,34 @@ These transformations prepare the necessary tables for an interactive Streamlit 
 - In-depth insights into the relationship between renewable energy, weather, and market dynamics.
 - Intuitive star-schema populated for ease of use for downstream users such as ML engineers or analysts
 
-## Installation
+## Installation and Usage
 1. Install Docker
-2. Clone repository: 
-3. Populate API keys into .env file based on env-sample found in PROTO directory
-4. In /PROTO/config_files you can choose the time period of data ingestion in config_dates.json (for testing purposes request weekly duration at max)
-5. In /PROTO/config_files country_code_mapper.csv you can choose which countries and/or electricity bidding zones to analyze
-6. In /PROTO directory run 'docker compose up'
-7. Open localhost:8080 to reach Airflow UI on your browser
-8. RUN DAG 1_ to populate iceberg and duckdb with raw
-9. RUN DAG 2_ to create star schema and enable Streamlit dashboard
-10. Open Localhost:8501 to view Streamlit
+   Ensure Docker is installed on your system. [Docker Installation Guide](https://docs.docker.com/get-docker/).
+
+2. Clone repository
+
+3. Populate API keys for ENTSO-E and VisualCrossing into .env file based on env-sample found in PROTO directory
+
+4. In the /PROTO/config_files/config_dates.json file, set the time period for data ingestion.
+    (For testing, a maximum of 48h duration highly recommended.)
+
+5. Modify the /PROTO/config_files/country_code_mapper.csv to select the countries or electricity bidding zones you wish to analyze. By default currently there are all countries around the Baltic Sea.
+
+6. In the /PROTO directory, start the services by running:
+    docker compose up
+7. Open your browser and go to http://localhost:8080 to access the Airflow UI.
+
+8. In the Airflow UI, trigger DAG "1_extract_load" to populate the Iceberg data lakehouse and DuckDB with raw data.
+
+9. Once DAG 1_ completes, trigger DAG "2_star_schema" to create the star schema and enable the Streamlit dashboard.
+
+10. After DAG "2_star_schema" completes, open your browser and go to http://localhost:8501 to interact with the real-time Streamlit dashboard.
+
+## APIs
+This project uses the following APIs:
+
+- **Electricity Data** (ENTSO-E):  
+   Provides detailed data on electricity consumption and production. [API Documentation](https://transparencyplatform.zendesk.com/hc/en-us/articles/15692855254548-Sitemap-for-Restful-API-Integration)
+  
+- **Weather Data** (VisualCrossing):  
+   Provides weather data, including temperature, precipitation, and other conditions. [API Documentation](https://www.visualcrossing.com/weather-api)
