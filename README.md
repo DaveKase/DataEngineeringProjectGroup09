@@ -14,10 +14,9 @@ Further transformations, including the creation of star schemas within DuckDB, a
 These transformations prepare the necessary tables for an interactive Streamlit dashboard that facilitates data exploration and visualization.
 
 ## Features
-- Automated data pipeline for seamless ingestion, transformation, and analysis.
+- Automated data pipeline that allows for data ingestion, transformation and analysis.
 - Interactive dashboard powered by Streamlit for real-time visualizations.
-- In-depth insights into the relationship between renewable energy, weather, and market dynamics.
-- Intuitive star-schema populated for ease of use for downstream users such as ML engineers or analysts
+- DuckDB database with an intuitive star-schema for ease of use for downstream users such as ML engineers or analysts
 
 ## Installation and Usage
 1. Install Docker
@@ -30,9 +29,9 @@ These transformations prepare the necessary tables for an interactive Streamlit 
 4. In the /PROTO/config_files/config_dates.json file, set the time period for data ingestion.
     (For testing, a maximum of 48h duration highly recommended.)
 
-5. Modify the /PROTO/config_files/country_code_mapper.csv to select the countries or electricity bidding zones you wish to analyze. By default currently there are all countries around the Baltic Sea.
+5. Modify the /PROTO/config_files/country_code_mapper.csv to select the countries or electricity bidding zones you wish to analyze. We recommend not changing the current settings, since the pipeline does not allow for dynamic changes at the moment. By default all the energy market regions around the Baltic Sea are selected.
 
-6. In the /PROTO directory, start the services by running: docker compose up
+6. In the /PROTO directory, start the services by running: docker compose up -d
 
 7. Open your browser and go to http://localhost:8080 to access the Airflow UI.
 
