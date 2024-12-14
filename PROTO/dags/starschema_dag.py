@@ -8,31 +8,35 @@ from datetime import datetime, timedelta  # Add timedelta import
 import duckdb
 import os
 
+DUCKDB_FILENAME = '/mnt/tmp/duckdb_data/star_schema_db.duckdb'
+
 # Basically router for create_tables_task. Now we have all table creations under one DAG, instead of 6 different DAGS.
 def create_tables():
+    duckdb_file = '/mnt/tmp/duckdb_data/star_schema_db.duckdb'
+
+    if not os.path.exists(DUCKDB_FILENAME):
+        print(f"Creating DuckDB file at: {DUCKDB_FILENAME}")  # Debug statement
+    
+    con = duckdb.connect(DUCKDB_FILENAME)
+
     print("creating tables")
-    create_measurements_fact_table()
-    create_bz_dimen_table()
-    create_energy_type_dimen_table()
-    create_weather_condition_dimen_table()
-    create_unit_dimen_table()
-    create_timestamp_dimen_table()
+    create_measurements_fact_table(con)
+    create_bz_dimen_table(con)
+    create_energy_type_dimen_table(con)
+    create_weather_condition_dimen_table(con)
+    create_unit_dimen_table(con)
+    create_timestamp_dimen_table(con)
+
+    con.close()
     print("Tables created successfully")
 
 # Takes the table name and the sql query as inputs and creates table in DuckDB
-def table_creation_script(table_name, sql):
+def table_creation_script(table_name, sql, con):
     print(f"Creating table {table_name}")
-    duckdb_file = '/mnt/tmp/duckdb_data/' + table_name + '.duckdb'
-
-    if not os.path.exists(duckdb_file):
-        print(f"Creating DuckDB file at: {duckdb_file}")  # Debug statement
     
-    con = duckdb.connect(duckdb_file)
-
     # Ensure the table exists
     print(f"Ensuring table {table_name} exists.")  # Debug statement
     con.execute(sql)
-    con.close()
     print(f"Table {table_name} created or exists")
 
 '''
@@ -40,7 +44,7 @@ Creating FACT table
 '''
 
 # Creating the fact table (measurements)
-def create_measurements_fact_table():
+def create_measurements_fact_table(con):
     table_name = "measurements_FACT"
     sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
@@ -58,14 +62,14 @@ def create_measurements_fact_table():
           weather_condition_x_unit_id BIGINT NOT NULL
         )"""
     
-    table_creation_script(table_name=table_name, sql=sql)
+    table_creation_script(table_name=table_name, sql=sql, con=con)
 
 '''
 Creating the dimension tables (all 5 of them)
 '''
 
 # Creating bidding zone dimension table
-def create_bz_dimen_table():
+def create_bz_dimen_table(con):
     table_name = "bidding_zone_DIMEN"
     sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
@@ -77,10 +81,10 @@ def create_bz_dimen_table():
           geometry VARCHAR
         )"""
     
-    table_creation_script(table_name=table_name, sql=sql)
+    table_creation_script(table_name=table_name, sql=sql, con=con)
 
 # Creating energy type dimension table
-def create_energy_type_dimen_table():
+def create_energy_type_dimen_table(con):
     table_name = "energy_type_DIMEN"
     sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
@@ -91,10 +95,10 @@ def create_energy_type_dimen_table():
           carbon INTEGER NOT NULL
         )"""
 
-    table_creation_script(table_name=table_name, sql=sql)
+    table_creation_script(table_name=table_name, sql=sql, con=con)
 
 # Creating weather condition dimension table
-def create_weather_condition_dimen_table():
+def create_weather_condition_dimen_table(con):
     table_name = "weather_condition_DIMEN"
     sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
@@ -105,10 +109,10 @@ def create_weather_condition_dimen_table():
           numerical INTEGER NOT NULL
         )"""
     
-    table_creation_script(table_name=table_name, sql=sql)
+    table_creation_script(table_name=table_name, sql=sql, con=con)
 
 # Creating unit dimension table
-def create_unit_dimen_table():
+def create_unit_dimen_table(con):
     table_name = "unit_DIMEN"
     sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
@@ -118,10 +122,10 @@ def create_unit_dimen_table():
           unit_class VARCHAR NOT NULL
         )"""
     
-    table_creation_script(table_name=table_name, sql=sql)
+    table_creation_script(table_name=table_name, sql=sql, con=con)
 
 # Creating timestamp dimension table
-def create_timestamp_dimen_table():
+def create_timestamp_dimen_table(con):
     table_name = "timestamp_DIMEN"
     sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
@@ -133,7 +137,7 @@ def create_timestamp_dimen_table():
           holiday INTEGER NOT NULL
         )"""
     
-    table_creation_script(table_name=table_name, sql=sql)
+    table_creation_script(table_name=table_name, sql=sql, con=con)
 
 '''
 Data selection and preparation
@@ -172,14 +176,17 @@ def get_data():
 
 # Takes the queried data and divides it into 6 tables
 def divide_data_into_starschema(weather, consumption, price, production):
-    print("dividing data...")    
-    populate_units_table(consumption, price, production)
-    populate_weather_condition_table(weather, consumption, price, production)
+    print("dividing data...")
+    con = duckdb.connect(DUCKDB_FILENAME)
 
+    populate_units_table(consumption, price, production, con)
+    #populate_weather_condition_table(weather, consumption, price, production)
+    
+    con.close()
     print("Data division into tables was SUCCESSFULLLL!!!!")
 
 # Populates the units_dimen table with units across other tables
-def populate_units_table(consumption, price, production):
+def populate_units_table(consumption, price, production, con):
     units = []
 
     for record in consumption:
@@ -202,9 +209,10 @@ def populate_units_table(consumption, price, production):
     units.append("cm")
     units.append("km")
     units.append("kph")
+    units.append("m/s")
     units.append("mb")
-    units.append("W/m^2")
-    units.append("J/m^2")
+    units.append("W/m²")
+    units.append("J/m²")
 
     for unit in units:
         unit_class = unit_mapper(unit)[0]
@@ -213,13 +221,12 @@ def populate_units_table(consumption, price, production):
         sql = f"""INSERT INTO unit_DIMEN (_id, unit_short, unit_long, unit_class) SELECT (SELECT COUNT(*) FROM unit_DIMEN) + 1, 
           \'{unit}\', \'{unit_long}\', \'{unit_class}\' WHERE NOT EXISTS (SELECT 1 FROM unit_DIMEN WHERE unit_short = \'{unit}\');"""
 
-        duckdb_file = '/mnt/tmp/duckdb_data/unit_DIMEN.duckdb'
-        con = duckdb.connect(duckdb_file)
         con.execute(sql)
-        con.close()
     
     print("units_DIMEN table populated with data")
 
+# Maps the short name of a unit to a long name and class of that unit.
+# I didn't think of a neater way of doing that at the moment
 def unit_mapper(unit):
     unit_class = ""
     unit_long = ""
@@ -251,18 +258,22 @@ def unit_mapper(unit):
     elif unit == "kph":
         unit_class = "weather"
         unit_long = "kilometers per hour"
+    elif unit == "m/s":
+        unit_class ="weather"
+        unit_long = "meters per second"
     elif unit == "mb":
         unit_class = "weather"
         unit_long = "millibars"
-    elif unit == "W/m^2":
+    elif unit == "W/m²":
         unit_class = "weather"
         unit_long = "watts per square meter"
-    elif unit == "J/m^2":
+    elif unit == "J/m²":
         unit_class = "weather"
         unit_long = "jauls per square meter"
     
     return unit_class, unit_long
 
+# This populates weather condition dimension table.
 def populate_weather_condition_table(weather, consumption, price, production):
     weather_conditions = []
     duckdb_file = '/mnt/tmp/duckdb_data/weather.duckdb'
