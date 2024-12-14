@@ -1,6 +1,6 @@
 
   
-  create view "combined_data"."main"."weather_cleaned__dbt_tmp" as (
+  create view "weather"."main"."weather_cleaned__dbt_tmp" as (
     with formatted_data as (
     -- Format columns and ensure consistent naming
     select
