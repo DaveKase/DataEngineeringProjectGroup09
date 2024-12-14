@@ -738,28 +738,30 @@ def populate_measurements_fact_table(con):
     for prod_row in prod_rows:
         common_value = prod_row[0]
 
-        weather_row = weather_con.execute(f"SELECT * FROM weather_cleaned WHERE eic_code = '{common_value}'").fetchone()
-        consumption_row = consumption_con.execute(f"SELECT * FROM consumption_data WHERE eic_code = '{common_value}'").fetchone()
-        price_row = price_con.execute(f"SELECT * FROM price_data WHERE eic_code = '{common_value}'").fetchone()
+        weather_row = weather_con.execute(f"SELECT * FROM weather_cleaned WHERE eic_code = '{common_value}' AND date_time = '{prod_row[4]}'").fetchone()
+        consumption_row = consumption_con.execute(f"SELECT * FROM consumption_data WHERE eic_code = '{common_value}' AND datetime = '{prod_row[4]}'").fetchone()
+        price_row = price_con.execute(f"SELECT * FROM price_data WHERE eic_code = '{common_value}' AND datetime = '{prod_row[4]}'").fetchone()
 
-        con.execute('''
-        INSERT INTO measurements_FACT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            current_id,  # _id
-            prod_row[4],  # date_time
-            prod_row[0],  # bzn_id (EIC code)
-            consumption_row[1],  # consumption_qty
-            consumption_row[2],  # consumption_unit
-            prod_row[3],  # produced_energy_x
-            prod_row[1],  # production_quantity_x
-            prod_row[2],  # production_unit
-            price_row[1],  # price
-            price_row[2],  # price_unit
-            weather_row[4],  # weather_condition_x (assuming temperature as weather condition)
-            'Celsius'  # weather_condition_x_unit (assuming temperature unit as Celsius)
-        ))
+         # Check if all rows are found
+        if weather_row and consumption_row and price_row:
+            con.execute('''
+            INSERT INTO measurements_FACT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                current_id,  # _id
+                prod_row[4],  # date_time
+                prod_row[0],  # bzn_id (EIC code)
+                consumption_row[1],  # consumption_qty
+                consumption_row[2],  # consumption_unit
+                prod_row[3],  # produced_energy_x
+                prod_row[1],  # production_quantity_x
+                prod_row[2],  # production_unit
+                price_row[1],  # price
+                price_row[2],  # price_unit
+                weather_row[4],  # weather_condition_x (assuming temperature as weather condition)
+                'Celsius'  # weather_condition_x_unit (assuming temperature unit as Celsius)
+            ))
 
-        current_id += 1
+            current_id += 1
 
     weather_con.close()
     consumption_con.close()
