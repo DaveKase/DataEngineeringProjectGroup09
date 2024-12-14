@@ -7,6 +7,7 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta  # Add timedelta import
 import duckdb
 import os
+import pandas as pd
 
 DUCKDB_FILENAME = '/mnt/tmp/duckdb_data/star_schema_db.duckdb'
 
@@ -178,6 +179,7 @@ def divide_data_into_starschema(weather, consumption, price, production):
     populate_weather_condition_table(weather, con)
     populate_energy_type_table(production, con)
     populate_bidding_zone_table(con)
+    populate_timestamp_table(con)
     
     con.close()
     print("Data division into tables was SUCCESSFULLLL!!!!")
@@ -652,7 +654,6 @@ def populate_bidding_zone_table(con):
 
     for bzn in bzn_to_country:
         country = bzn_to_country[bzn]
-        print(country)
         resolution = 60
 
         if country == "Poland" or country == "Lithuania" or country == "Germany" or country == "Finland":
@@ -667,12 +668,72 @@ def populate_bidding_zone_table(con):
 
     print("energy_type_DIMEN table populated with data")
 
+# Populates table with timestamps
+def populate_timestamp_table(con):
+    # Define the start and end dates
+    start_date = datetime(2024, 12, 1)
+    end_date = datetime(2024, 12, 31, 23, 59)
+
+    # Generate timestamps with 15 minute increments
+    timestamps = pd.date_range(start=start_date, end=end_date, freq='15T')
+
+    # Create a DataFrame to store the results
+    data = {
+        'Timestamp': timestamps,
+        'Day of Week': [timestamp.strftime('%A') for timestamp in timestamps],
+        'Day Type': [get_day_type(timestamp) for timestamp in timestamps]
+    }
+
+    df = pd.DataFrame(data)
+
+    # Add columns for workingday, weekend, and holiday
+    df['workingday'] = df['Day Type'].apply(lambda x: 1 if x == 'Working Day' else 0)
+    df['weekend'] = df['Day Type'].apply(lambda x: 1 if x == 'Weekend' else 0)
+    df['holiday'] = df['Day Type'].apply(lambda x: 1 if x == 'Holiday' else 0)
+
+    # Select the required columns for SQL insertion
+    df_sql = df[['Timestamp', 'Day of Week', 'workingday', 'weekend', 'holiday']]
+
+    # Convert DataFrame to list of tuples for SQL insertion
+    data_for_sql = [tuple(row) for row in df_sql.to_numpy()]
+
+    # Print the first 5 rows to verify
+    print(data_for_sql[:5])
+
+    # Example SQL insertion code (assuming you have a connection `con` to your database)
+    for row in data_for_sql:
+        sql = f"""INSERT INTO timestamp_DIMEN (_id, datetime, weekday, workingday, weekend, holiday) 
+            SELECT (SELECT COUNT(*) FROM timestamp_DIMEN) + 1,
+            '{row[0]}', '{row[1]}', {row[2]}, {row[3]}, {row[4]} 
+            WHERE NOT EXISTS (SELECT 1 FROM timestamp_DIMEN WHERE datetime = '{row[0]}');
+        """
+
+        con.execute(sql)
+    
+    print("timestamp_DIMEN table populated with data")
+
+# Function to determine if a date is a holiday, weekend or working day
+def get_day_type(date):
+    holidays = [
+        datetime(2024, 12, 24),
+        datetime(2024, 12, 25),
+        datetime(2024, 12, 26)
+    ]
+    
+    if date.date() in [holiday.date() for holiday in holidays]:
+        return 'Holiday'
+    elif date.weekday() >= 5:  # Saturday and Sunday
+        return 'Weekend'
+    else:
+        return 'Working Day'
+
+
 '''
 DAG definitions and running order
 '''
 # Define the DAG
 with DAG(
-    dag_id="starschema_transform",  # Name of the DAG
+    dag_id="2_star_schema",  # Name of the DAG
     default_args={
         'owner': 'airflow',
         'start_date': datetime(2024, 12, 7),  # Starting date of the DAG
