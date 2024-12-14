@@ -1,5 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
 import requests
 import xml.etree.ElementTree as ET
 import pandas as pd
@@ -645,6 +646,8 @@ def process_and_save_weather_to_iceberg(**context):
         df["Country"] = country_name
         df["EIC"] = row["EIC"]
         df["BZN"] = row["BZN"]
+        df["EIC"] = df["EIC"].str.rstrip('\t') #Remove \t from Poland EIC code
+
 
         # Include the station contributions as a single JSON-like string
         station_contributions_str = json.dumps(station_contributions)
@@ -955,9 +958,14 @@ with DAG(
         task_id='load_weather_to_duckdb',
         python_callable=load_weather_to_duckdb
     )
+    clean_weather = BashOperator(
+        task_id="clean_weather",
+        bash_command="docker exec -i dbt dbt run --models weather_cleaned",  # Run the DBT command inside the dbt container
+        dag=dag,
+    )
     
 
     fetch_and_process_production >> save_production_to_iceberg >> load_production_to_duckdb
     fetch_and_process_price >> save_price_to_iceberg >> load_price_to_duckdb
     fetch_and_process_consumption >> save_consumption_to_iceberg >> load_consumption_to_duckdb
-    fetch_weather_data >> process_and_save_weather_to_iceberg >> load_weather_to_duckdb
+    fetch_weather_data >> process_and_save_weather_to_iceberg >> load_weather_to_duckdb >> clean_weather
