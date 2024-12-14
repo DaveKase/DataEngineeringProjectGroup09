@@ -144,7 +144,7 @@ def get_data():
 
   duckdb_file = '/mnt/tmp/duckdb_data/weather.duckdb'
   con = duckdb.connect(duckdb_file)
-  sql = "select * from weather_data;"
+  sql = "select * from weather_cleaned;"
   weather = con.sql(sql).fetchall()
   con.close()
 
@@ -175,7 +175,8 @@ def divide_data_into_starschema(weather, consumption, price, production):
     con = duckdb.connect(DUCKDB_FILENAME)
 
     populate_units_table(consumption, price, production, con)
-    populate_weather_condition_table(weather, consumption, price, production, con)
+    populate_weather_condition_table(weather, con)
+    populate_energy_type_table(production, con)
     
     con.close()
     print("Data division into tables was SUCCESSFULLLL!!!!")
@@ -273,11 +274,11 @@ def unit_mapper(unit):
     return unit_class, unit_long
 
 # This populates weather condition dimension table.
-def populate_weather_condition_table(weather, consumption, price, production, con):
+def populate_weather_condition_table(weather, con):
     weather_conditions = []
     duckdb_file = '/mnt/tmp/duckdb_data/weather.duckdb'
     table_header_con = duckdb.connect(duckdb_file)
-    table_headers = "SELECT column_name FROM information_schema.columns WHERE table_name = 'weather_data';"
+    table_headers = "SELECT column_name FROM information_schema.columns WHERE table_name = 'weather_cleaned';"
     header_names = table_header_con.sql(table_headers).fetchall()
     table_header_con.close()
 
@@ -295,8 +296,6 @@ def populate_weather_condition_table(weather, consumption, price, production, co
 
     for record in weather_dict:
         conditions = record['conditions']
-        if record['weathertype'] != '':
-            conditions += ", " + record['weathertype']
 
          # Split conditions into separate values
         condition_list = [condition.strip() for condition in conditions.split(',')]
@@ -306,7 +305,7 @@ def populate_weather_condition_table(weather, consumption, price, production, co
                 weather_conditions.append(condition)
     
     for header in header_names:
-        if header != "datetimeStr" and header != "datetime" and header != "stationinfo" and header != "weathertype" and header != "conditions" and header != "Country" and header != "EIC" and header != "BZN" and header != "stationContributions":
+        if header != "datetimeStr" and header != "date_time" and header != "station_info" and header != "weathertype" and header != "conditions" and header != "country" and header != "eic_code" and header != "BZN" and header != "contributing_stations" and header != "bzn":
              if header not in weather_conditions:
                 weather_conditions.append(header)
 
@@ -326,134 +325,8 @@ def condition_mapper(condition):
     condition_type = ""
     numerical = 0
 
-    if condition == "Partially cloudy":
-        condition_short = "pcloudy"
-        condition_long = condition
-        condition_type = "clouds"
-        numerical = 0
-    if condition == "Overcast":
-        condition_short = "ovrcst"
-        condition_long = condition
-        condition_type = "clouds"
-        numerical = 0
-    if condition == "Light Snow":
-        condition_short = "lghtsnow"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Rain":
-        condition_short = "rain"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-        numerical = 0
-    if condition == "Snow":
-        condition_short = "snow"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Snow Showers":
-        condition_short = "snowshwrs"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Mist":
-        condition_short = condition
-        condition_long = condition
-        condition_type = "air"
-        numerical = 0
-    if condition == "Light Rain And Snow":
-        condition_short = "lghtrainandsnow"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Light Rain":
-        condition_short = "lghtrain"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Freezing Drizzle/Freezing Rain":
-        condition_short = "frdrizrain"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Sky Coverage Increasing":
-        condition_short = "skycovinc"
-        condition_long = condition
-        condition_type = "air"
-        numerical = 0
-    if condition == "Light Freezing Rain":
-        condition_short = "lghtfrizrain"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Drizzle":
-        condition_short = "drzl"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Fog":
-        condition_short = "fog"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Light Drizzle":
-        condition_short = "lghtdrzl"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Clear":
-        condition_short = "clr"
-        condition_long = condition
-        condition_type = "clouds"
-        numerical = 0
-    if condition == "Heavy Rain And Snow":
-        condition_short = "clr"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Rain Showers":
-        condition_short = "rainshwrs"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Dust storm":
-        condition_short = "dststrm"
-        condition_long = condition
-        condition_type = "air"
-        numerical = 0
-    if condition == "Light Freezing Drizzle/Freezing Rain":
-        condition_short = "lghtfrizdrzlandfrizrain"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Precipitation In Vicinity":
-        condition_short = "prcptinvcn"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Snow And Rain Showers":
-        condition_short = "snwnrainshwrs"
-        condition_long = condition
-        condition_type = "precipitation"
-        numerical = 0
-    if condition == "Ice":
-        condition_short = "ice"
-        condition_long = condition
-        condition_type = "air"
-        numerical = 0
-    if condition == "Light Drizzle/Rain":
-        condition_short = "lghtdrizlnrain"
-        condition_long = condition
-        condition_type = "air"
-        numerical = 0
-    if condition == "Sky Coverage Decreasing":
-        condition_short = "skycovdec"
-        condition_long = condition
-        condition_type = "air"
-        numerical = 0
-    if condition == "wdir":
-        condition_short = condition
+    if condition == "wind_direction":
+        condition_short = "wdir"
         condition_long = "wind direction"
         condition_type = "wind"
         numerical = 1
@@ -462,38 +335,38 @@ def condition_mapper(condition):
         condition_long = "cloud cover"
         condition_type = "clouds"
         numerical = 1
-    if condition == "mint":
-        condition_short = condition
+    if condition == "minimum_temperature":
+        condition_short = "mint"
         condition_long = "minimum temperature"
         condition_type = "air"
         numerical = 1
-    if condition == "precip":
-        condition_short = condition
+    if condition == "precipitation":
+        condition_short = "perc"
         condition_long = "precipitation"
         condition_type = "precipitation"
         numerical = 1
-    if condition == "solarradiation":
+    if condition == "solar_radiation":
         condition_short = "soalrrad"
         condition_long = "solar radiation"
         condition_type = "solar"
         numerical = 1
-    if condition == "dew":
-        condition_short = condition
+    if condition == "dew_point":
+        condition_short = "dew"
         condition_long = "dew point"
         condition_type = "air"
         numerical = 1
-    if condition == "humidity":
-        condition_short = "hmdty"
+    if condition == "relative_humidity":
+        condition_short = "rhmdty"
         condition_long = condition
         condition_type = "air"
         numerical = 1
-    if condition == "temp":
-        condition_short = "temperature"
+    if condition == "temperature":
+        condition_short = "temp"
         condition_long = condition
         condition_type = "air"
         numerical = 1
-    if condition == "maxt":
-        condition_short = condition
+    if condition == "maximum_temperature":
+        condition_short = "maxt"
         condition_long = "maximum temperature"
         condition_type = "air"
         numerical = 1
@@ -502,17 +375,17 @@ def condition_mapper(condition):
         condition_long = condition
         condition_type = "air"
         numerical = 1
-    if condition == "wspd":
-        condition_short = condition
+    if condition == "wind_speed":
+        condition_short = "wspd"
         condition_long = "wind speed"
         condition_type = "air"
         numerical = 1
-    if condition == "solarenergy":
+    if condition == "solar_energy":
         condition_short = "solaren"
         condition_long = "solar energy"
         condition_type = "air"
         numerical = 1
-    if condition == "sealevelpressure":
+    if condition == "sea_level_pressure":
         condition_short = "slevprs"
         condition_long = "sealevel pressure"
         condition_type = "air"
@@ -534,6 +407,110 @@ def condition_mapper(condition):
         numerical = 1
 
     return condition_short, condition_long, condition_type, numerical
+
+def populate_energy_type_table(production, con):
+    energy_types = []
+
+    for record in production:
+        if record[3] not in energy_types:
+            energy_types.append(record[3])
+
+    for energy_type in energy_types:
+        sql = f"""INSERT INTO energy_type_DIMEN (_id, energy_type_x, energy_type_class, renewable, carbon) SELECT (SELECT COUNT(*) FROM energy_type_DIMEN) + 1, 
+          \'{energy_type}\', \'{energy_type_mapper(energy_type)[0]}\', {energy_type_mapper(energy_type)[1]}, {energy_type_mapper(energy_type)[2]} 
+          WHERE NOT EXISTS (SELECT 1 FROM energy_type_DIMEN WHERE energy_type_x = \'{energy_type}\');"""
+        
+        con.execute(sql)
+    
+    print("energy_type_DIMEN table populated with data")
+
+def energy_type_mapper(energy_type):
+    energy_type_class = ""
+    renewable = 0
+    carbon = 0
+
+    if energy_type == "Biomass":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Fossil Coal-derived gas":
+        energy_type_class = "fossil"
+        renewable = 0
+        carbon = 1
+    if energy_type == "Fossil Gas":
+        energy_type_class = "fossil"
+        renewable = 0
+        carbon = 1
+    if energy_type == "Fossil Oil shale":
+        energy_type_class = "fossil"
+        renewable = 0
+        carbon = 1
+    if energy_type == "Fossil Peat":
+        energy_type_class = "fossil"
+        renewable = 0
+        carbon = 1
+    if energy_type == "Hydro Run-of-river and poundage":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Other":
+        energy_type_class = "other"
+        renewable = 0
+        carbon = 0
+    if energy_type == "Other renewable":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Solar":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Waste":
+        energy_type_class = "other"
+        renewable = 0
+        carbon = 0
+    if energy_type == "Wind Onshore":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Wind Offshore":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Hydro Pumped Storage":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Fossil Brown coal/Lignite":
+        energy_type_class = "fossil"
+        renewable = 0
+        carbon = 1
+    if energy_type == "Fossil Hard coal":
+        energy_type_class = "fossil"
+        renewable = 0
+        carbon = 1
+    if energy_type == "Fossil Oil":
+        energy_type_class = "fossil"
+        renewable = 0
+        carbon = 1
+    if energy_type == "Hydro Water Reservoir":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Geothermal":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Marine":
+        energy_type_class = "green"
+        renewable = 1
+        carbon = 0
+    if energy_type == "Nuclear":
+        energy_type_class = "other"
+        renewable = 0
+        carbon = 0
+    
+    return energy_type_class, renewable, carbon
 
 '''
 DAG definitions and running order
