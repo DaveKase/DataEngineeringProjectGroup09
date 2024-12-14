@@ -19,7 +19,7 @@ def create_tables():
     con = duckdb.connect(DUCKDB_FILENAME)
 
     print("creating tables")
-    create_measurements_fact_table(con)
+    #create_measurements_fact_table(con) #Creating the table later dynamically
     create_bz_dimen_table(con)
     create_energy_type_dimen_table(con)
     create_weather_condition_dimen_table(con)
@@ -727,45 +727,85 @@ def get_day_type(date):
 
 # Populating fact measurements table with data from all tables
 def populate_measurements_fact_table(con):
-    weather_con = duckdb.connect('/mnt/tmp/duckdb_data/weather.duckdb')
-    consumption_con = duckdb.connect('/mnt/tmp/duckdb_data/consumption.duckdb')
-    price_con = duckdb.connect('/mnt/tmp/duckdb_data/price.duckdb')
-    prod_con = duckdb.connect('/mnt/tmp/duckdb_data/production.duckdb')
+    # Paths to source DuckDB tables
+    weather_path = '/mnt/tmp/duckdb_data/weather.duckdb'
+    consumption_path = '/mnt/tmp/duckdb_data/consumption.duckdb'
+    price_path = '/mnt/tmp/duckdb_data/price.duckdb'
+    production_path = '/mnt/tmp/duckdb_data/production.duckdb'
 
-    prod_rows = prod_con.execute("SELECT * FROM production_data").fetchall()
-    current_id = con.execute(f"SELECT COUNT(*) FROM measurements_FACT").fetchone()[0] + 1
+    # Load data into Pandas DataFrames
+    consumption_df = duckdb.connect(consumption_path).execute("SELECT * FROM consumption_data").fetchdf()
+    production_df = duckdb.connect(production_path).execute("SELECT * FROM production_data").fetchdf()
+    price_df = duckdb.connect(price_path).execute("SELECT * FROM price_data").fetchdf()
+    weather_df = duckdb.connect(weather_path).execute("SELECT * FROM weather_cleaned").fetchdf()
 
-    for prod_row in prod_rows:
-        common_value = prod_row[0]
+    # Ensure the EIC codes are used as keys
+    consumption_df.rename(columns={"datetime": "datetime"}, inplace=True)
+    production_df.rename(columns={"datetime": "datetime"}, inplace=True)
+    price_df.rename(columns={"datetime": "datetime"}, inplace=True)
+    weather_df.rename(columns={"date_time": "datetime"}, inplace=True)
 
-        weather_row = weather_con.execute(f"SELECT * FROM weather_cleaned WHERE eic_code = '{common_value}'").fetchone()
-        consumption_row = consumption_con.execute(f"SELECT * FROM consumption_data WHERE eic_code = '{common_value}'").fetchone()
-        price_row = price_con.execute(f"SELECT * FROM price_data WHERE eic_code = '{common_value}'").fetchone()
+    # Remove duplicates from production data
+    production_df.drop_duplicates(subset=["eic_code", "datetime", "produced_energy_type"], inplace=True)
 
-        con.execute('''
-        INSERT INTO measurements_FACT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            current_id,  # _id
-            prod_row[4],  # date_time
-            prod_row[0],  # bzn_id (EIC code)
-            consumption_row[1],  # consumption_qty
-            consumption_row[2],  # consumption_unit
-            prod_row[3],  # produced_energy_x
-            prod_row[1],  # production_quantity_x
-            prod_row[2],  # production_unit
-            price_row[1],  # price
-            price_row[2],  # price_unit
-            weather_row[4],  # weather_condition_x (assuming temperature as weather condition)
-            'Celsius'  # weather_condition_x_unit (assuming temperature unit as Celsius)
-        ))
+    # Pivot production data from long to wide format
+    production_wide_df = production_df.pivot(
+        index=["eic_code", "datetime"],  # Unique keys for rows
+        columns="produced_energy_type",  # Column to widen
+        values="quantity"  # Values to fill
+    ).reset_index()
 
-        current_id += 1
+    # Rename columns to lowercase and replace spaces with underscores
+    production_wide_df.columns = [
+        "eic_code" if col == "eic_code" else
+        "datetime" if col == "datetime" else
+        f"production_quantity_{col.lower().replace(' ', '_')}" for col in production_wide_df.columns
+    ]
 
-    weather_con.close()
-    consumption_con.close()
-    price_con.close()
-    prod_con.close()
-    print("measurements_FACT table populated with data")
+    # Resample weather data to 15-minute intervals
+    weather_df["datetime"] = pd.to_datetime(weather_df["datetime"])  # Ensure datetime format
+    weather_resampled = (
+        weather_df.set_index("datetime")
+        .groupby("eic_code", group_keys=False)  # Group by bidding zones without adding 'bzn_id' as an index
+        .resample("15T")    # Resample to 15-minute intervals
+        .ffill()            # Forward-fill to propagate hourly data
+        .reset_index()      # Reset index without duplicating 'bzn_id'
+    )
+
+    # Merge DataFrames sequentially
+    merged_df = consumption_df.merge(production_wide_df, on=["eic_code", "datetime"], how="outer")
+    merged_df = merged_df.merge(price_df, on=["eic_code", "datetime"], how="outer")
+    merged_df = merged_df.merge(weather_resampled, on=["eic_code", "datetime"], how="outer")
+
+    # Fill missing values with defaults (e.g., 0 for quantities, NA for text)
+    merged_df.fillna({
+        "consumption_quantity": 0,
+        "price": 0,
+        **{col: 0 for col in merged_df.columns if col.startswith("production_quantity_")},
+        **{col: "NA" for col in ["price_unit", "weather_condition", "weather_unit"]}
+    }, inplace=True)
+
+    # Add an auto-incrementing ID column
+    #merged_df["_id"] = range(1, len(merged_df) + 1)
+
+    # Debugging output for verification
+    print("Merged DataFrame Columns:", merged_df.columns)
+    print("Sample Data:")
+    print(merged_df.head())
+
+    # Insert data into the measurements table
+    # Register the Pandas DataFrame as a temporary table in DuckDB
+    con.register("temp_merged_df", merged_df)
+
+    # Create the 'measurements' table from the registered temporary table
+    con.execute("DROP TABLE IF EXISTS measurements_FACT")
+    con.execute("CREATE TABLE measurements_FACT AS SELECT * FROM temp_merged_df")
+
+    # Optional: Clean up the temporary table
+    con.unregister("temp_merged_df")
+
+    print("measurements_FACT table populated successfully!")
+
 
 '''
 DAG definitions and running order
