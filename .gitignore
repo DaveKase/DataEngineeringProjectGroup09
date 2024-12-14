@@ -7,3 +7,4 @@
 *.msgpack
 *.sql
 *.gpickle
+*.wal

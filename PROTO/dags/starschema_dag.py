@@ -47,17 +47,17 @@ def create_measurements_fact_table(con):
     sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
           _id BIGINT PRIMARY KEY,
-          date_time_id BIGINT NOT NULL,
-          bzn_id BIGINT NOT NULL,
+          date_time VARCHAR NOT NULL,
+          bzn_id VARCHAR NOT NULL,
           consumption_qty FLOAT NOT NULL,
-          consumption_unit_id BIGINT NOT NULL,
-          produced_energy_x_id BIGINT NOT NULL,
+          consumption_unit VARCHAR NOT NULL,
+          produced_energy_x VARCHAR NOT NULL,
           production_quantity_x FLOAT NOT NULL,
           production_unit VARCHAR NOT NULL,
           price FLOAT NOT NULL,
-          price_unit_id BIGINT NOT NULL,
-          weather_condition_x_id BIGINT NOT NULL,
-          weather_condition_x_unit_id BIGINT NOT NULL
+          price_unit VARCHAR NOT NULL,
+          weather_condition_x VARCHAR NOT NULL,
+          weather_condition_x_unit VARCHAR NOT NULL
         )"""
     
     table_creation_script(table_name=table_name, sql=sql, con=con)
@@ -180,6 +180,7 @@ def divide_data_into_starschema(weather, consumption, price, production):
     populate_energy_type_table(production, con)
     populate_bidding_zone_table(con)
     populate_timestamp_table(con)
+    populate_measurements_fact_table(con)
     
     con.close()
     print("Data division into tables was SUCCESSFULLLL!!!!")
@@ -666,7 +667,7 @@ def populate_bidding_zone_table(con):
         
         con.execute(sql)
 
-    print("energy_type_DIMEN table populated with data")
+    print("bidding_zone_DIMEN table populated with data")
 
 # Populates table with timestamps
 def populate_timestamp_table(con):
@@ -697,9 +698,6 @@ def populate_timestamp_table(con):
     # Convert DataFrame to list of tuples for SQL insertion
     data_for_sql = [tuple(row) for row in df_sql.to_numpy()]
 
-    # Print the first 5 rows to verify
-    print(data_for_sql[:5])
-
     # Example SQL insertion code (assuming you have a connection `con` to your database)
     for row in data_for_sql:
         sql = f"""INSERT INTO timestamp_DIMEN (_id, datetime, weekday, workingday, weekend, holiday) 
@@ -727,6 +725,47 @@ def get_day_type(date):
     else:
         return 'Working Day'
 
+# Populating fact measurements table with data from all tables
+def populate_measurements_fact_table(con):
+    weather_con = duckdb.connect('/mnt/tmp/duckdb_data/weather.duckdb')
+    consumption_con = duckdb.connect('/mnt/tmp/duckdb_data/consumption.duckdb')
+    price_con = duckdb.connect('/mnt/tmp/duckdb_data/price.duckdb')
+    prod_con = duckdb.connect('/mnt/tmp/duckdb_data/production.duckdb')
+
+    prod_rows = prod_con.execute("SELECT * FROM production_data").fetchall()
+    current_id = con.execute(f"SELECT COUNT(*) FROM measurements_FACT").fetchone()[0] + 1
+
+    for prod_row in prod_rows:
+        common_value = prod_row[0]
+
+        weather_row = weather_con.execute(f"SELECT * FROM weather_cleaned WHERE eic_code = '{common_value}'").fetchone()
+        consumption_row = consumption_con.execute(f"SELECT * FROM consumption_data WHERE eic_code = '{common_value}'").fetchone()
+        price_row = price_con.execute(f"SELECT * FROM price_data WHERE eic_code = '{common_value}'").fetchone()
+
+        con.execute('''
+        INSERT INTO measurements_FACT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            current_id,  # _id
+            prod_row[4],  # date_time
+            prod_row[0],  # bzn_id (EIC code)
+            consumption_row[1],  # consumption_qty
+            consumption_row[2],  # consumption_unit
+            prod_row[3],  # produced_energy_x
+            prod_row[1],  # production_quantity_x
+            prod_row[2],  # production_unit
+            price_row[1],  # price
+            price_row[2],  # price_unit
+            weather_row[4],  # weather_condition_x (assuming temperature as weather condition)
+            'Celsius'  # weather_condition_x_unit (assuming temperature unit as Celsius)
+        ))
+
+        current_id += 1
+
+    weather_con.close()
+    consumption_con.close()
+    price_con.close()
+    prod_con.close()
+    print("measurements_FACT table populated with data")
 
 '''
 DAG definitions and running order
