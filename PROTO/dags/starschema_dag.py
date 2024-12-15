@@ -740,13 +740,17 @@ def populate_measurements_fact_table(con):
     weather_df = duckdb.connect(weather_path).execute("SELECT * FROM weather_cleaned").fetchdf()
 
     # Ensure the EIC codes are used as keys
-    consumption_df.rename(columns={"datetime": "datetime"}, inplace=True)
+    consumption_df.rename(columns={"quantity": "consumption_quantity", "unit": "electricity_unit", "datetime": "datetime"}, inplace=True)
     production_df.rename(columns={"datetime": "datetime"}, inplace=True)
     price_df.rename(columns={"datetime": "datetime"}, inplace=True)
     weather_df.rename(columns={"date_time": "datetime"}, inplace=True)
 
-    # Remove duplicates from production data
+    # Remove duplicates from data
+    consumption_df.drop_duplicates(subset=["eic_code", "datetime"], inplace=True)
     production_df.drop_duplicates(subset=["eic_code", "datetime", "produced_energy_type"], inplace=True)
+    price_df.drop_duplicates(subset=["eic_code", "datetime"], inplace=True)
+    weather_df.drop_duplicates(subset=["eic_code", "datetime"], inplace=True)
+    
 
     # Pivot production data from long to wide format
     production_wide_df = production_df.pivot(
@@ -757,9 +761,9 @@ def populate_measurements_fact_table(con):
 
     # Rename columns to lowercase and replace spaces with underscores
     production_wide_df.columns = [
-        "eic_code" if col == "eic_code" else
-        "datetime" if col == "datetime" else
-        f"production_quantity_{col.lower().replace(' ', '_')}" for col in production_wide_df.columns
+    "eic_code" if col == "eic_code" else
+    "datetime" if col == "datetime" else
+    f"production_quantity_{col.lower().replace(' ', '_').replace('-', '_').replace('/', '_')}" for col in production_wide_df.columns
     ]
 
     # Resample weather data to 15-minute intervals
@@ -771,10 +775,20 @@ def populate_measurements_fact_table(con):
         .ffill()            # Forward-fill to propagate hourly data
         .reset_index()      # Reset index without duplicating 'bzn_id'
     )
+    
+    # Resample price data to 15-minute intervals
+    price_df["datetime"] = pd.to_datetime(price_df["datetime"])  # Ensure datetime format
+    price_resampled = (
+        price_df.set_index("datetime")
+        .groupby("eic_code", group_keys=False)  # Group by bidding zones without adding 'bzn_id' as an index
+        .resample("15T")    # Resample to 15-minute intervals
+        .ffill()            # Forward-fill to propagate hourly data
+        .reset_index()      # Reset index without duplicating 'bzn_id'
+    )
 
     # Merge DataFrames sequentially
     merged_df = consumption_df.merge(production_wide_df, on=["eic_code", "datetime"], how="outer")
-    merged_df = merged_df.merge(price_df, on=["eic_code", "datetime"], how="outer")
+    merged_df = merged_df.merge(price_resampled, on=["eic_code", "datetime"], how="outer")
     merged_df = merged_df.merge(weather_resampled, on=["eic_code", "datetime"], how="outer")
 
     # Fill missing values with defaults (e.g., 0 for quantities, NA for text)
@@ -784,9 +798,9 @@ def populate_measurements_fact_table(con):
         **{col: 0 for col in merged_df.columns if col.startswith("production_quantity_")},
         **{col: "NA" for col in ["price_unit", "weather_condition", "weather_unit"]}
     }, inplace=True)
-
-    # Add an auto-incrementing ID column
-    #merged_df["_id"] = range(1, len(merged_df) + 1)
+    
+    # Remove rows where bzn is NULL or empty
+    merged_df = merged_df[merged_df['bzn'].notnull() & (merged_df['bzn'] != '')]
 
     # Debugging output for verification
     print("Merged DataFrame Columns:", merged_df.columns)
