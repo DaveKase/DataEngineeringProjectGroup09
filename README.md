@@ -41,6 +41,9 @@ These transformations prepare the necessary tables for an interactive Streamlit 
 
 10. After DAG "2_star_schema" completes, open your browser and go to http://localhost:8501 to interact with the real-time Streamlit dashboard.
 
+## Toubleshoot
+When a DAG fails the first things would be to clear the logs directory and all subdirectories and files in following directories:warehouse/consumption, warehouse/price, warehouse/production and warehouse/weather, then remove docker containers and start again. Also remove .duckdb files from duckdb_data
+
 ## APIs
 This project uses the following APIs:
 
